@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+python-dotenv
+plivo
+azure-cognitiveservices-speech
+openai
+psycopg2-binary
