@@ -2,3 +2,8 @@
 env/
 __pycache__/
 *.pyc
+# Chroma DB
+app/data/chroma_db/
+*.bin
+*.sqlite3
+env311/
