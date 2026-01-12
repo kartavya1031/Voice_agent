@@ -145,8 +145,36 @@ async def receive_audio(ws):
                     print("🔊 AI responding...")
 
             elif data["type"] == "audio_end":
-                print(f"✅ Response complete ({chunk_count} chunks)")
+                print(f"✅ Received {chunk_count} chunks, waiting for playback to finish...")
+                
+                # Wait for playback queue to empty (all audio played)
+                while not playback_queue.empty():
+                    await asyncio.sleep(0.1)
+                
+                # Small delay to ensure last chunk finishes playing
+                await asyncio.sleep(0.3)
+                
+                print("🔈 Playback complete")
                 chunk_count = 0
+                
+                # Notify server that playback is complete
+                try:
+                    await ws.send(json.dumps({"type": "playback_complete"}))
+                except Exception as e:
+                    print(f"   ⚠️ Could not send playback_complete: {e}")
+            
+            elif data["type"] == "call_end":
+                reason = data.get("reason", "unknown")
+                print(f"\n📞 CALL ENDED - Reason: {reason}")
+                if reason == "max_duration":
+                    print("   ⏱️ Maximum call duration reached (5 minutes)")
+                elif reason == "silence_timeout":
+                    print("   🔇 No speech detected for 10 seconds")
+                elif reason == "user_intent":
+                    print("   👋 User ended the conversation")
+                elif reason == "conversation_complete":
+                    print("   ✅ Conversation completed naturally")
+                break
                 
         except websockets.exceptions.ConnectionClosed:
             print("❌ Connection closed")

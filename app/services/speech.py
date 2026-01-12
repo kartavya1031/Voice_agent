@@ -6,17 +6,17 @@ speech_config = speechsdk.SpeechConfig(
     region=SPEECH_REGION
 )
 
-speech_config.speech_recognition_language = "mr-IN"
-speech_config.speech_synthesis_voice_name = "mr-IN-AarohiNeural"
+speech_config.speech_recognition_language = "en-IN"
+speech_config.speech_synthesis_voice_name = "en-IN-NeerjaNeural"
 
 speech_config.set_property(
     speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs,
-    "400"
+    "100"
 )
 
 speech_config.set_property(
     speechsdk.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs,
-    "400"
+    "100"
 )
 
 def create_continuous_recognizer():
