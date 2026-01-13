@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -10,9 +10,10 @@ import re
 import json
 import time
 import os
+import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 # Global turn tracking for barge-in support
 current_turn_id = 0
@@ -22,8 +23,20 @@ from app.services.llm import ask_ai, ask_ai_streaming
 from app.services.speech import (
     text_to_speech,
     text_to_speech_streaming,
-    create_streaming_recognizer
+    create_streaming_recognizer,
+    update_speech_settings,
+    get_current_speech_settings
 )
+from app.services.vector_store import (
+    set_active_knowledge_base,
+    create_knowledge_base_from_text,
+    delete_knowledge_base as delete_kb_collection,
+    get_active_kb_info,
+    get_kb_file_path,
+    KB_FILES_DIR
+)
+from app.services.agent_config import agent_config_service
+from app.db.service import call_service
 
 app = FastAPI(title="Anvenssa Voice Agent API")
 
@@ -35,6 +48,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Initialize speech settings from saved config on startup
+@app.on_event("startup")
+def startup_event():
+    """Initialize settings from saved config"""
+    speech_settings = agent_config_service.get_speech_settings()
+    update_speech_settings(
+        recognition_language=speech_settings.recognition_language,
+        synthesis_voice=speech_settings.synthesis_voice_name
+    )
+    
+    # Set active knowledge base if configured
+    active_kb = agent_config_service.get_active_knowledge_base()
+    if active_kb:
+        set_active_knowledge_base(active_kb.id)
+        print(f"📚 Loaded active knowledge base: {active_kb.name}")
+    
+    print(f"🗣️ Speech settings loaded: lang={speech_settings.recognition_language}, voice={speech_settings.synthesis_voice_name}")
 
 # Configurable Call Settings (can be changed via API)
 class CallSettings:
@@ -51,6 +82,34 @@ class SettingsUpdate(BaseModel):
 class SettingsResponse(BaseModel):
     max_call_duration: int
     max_silence_duration: int
+
+
+# Agent Configuration Pydantic Models
+class SpeechSettingsUpdate(BaseModel):
+    recognition_language: Optional[str] = None
+    synthesis_voice_name: Optional[str] = None
+
+class SpeechSettingsResponse(BaseModel):
+    recognition_language: str
+    synthesis_voice_name: str
+
+class KnowledgeBaseResponse(BaseModel):
+    id: str
+    name: str
+    filename: str
+    created_at: str
+    chunk_count: int
+
+class AgentConfigResponse(BaseModel):
+    speech_settings: SpeechSettingsResponse
+    active_knowledge_base_id: Optional[str]
+    knowledge_bases: List[KnowledgeBaseResponse]
+
+class SystemPromptUpdate(BaseModel):
+    system_prompt: str
+
+class SystemPromptResponse(BaseModel):
+    system_prompt: str
 
 
 # API Endpoints
@@ -75,35 +134,342 @@ def update_settings(update: SettingsUpdate):
         "max_silence_duration": settings.max_silence_duration
     }
 
-@app.get("/api/transcripts")
-def list_transcripts():
-    """List all saved transcripts"""
-    transcript_dir = Path(__file__).parent / "transcripts"
-    if not transcript_dir.exists():
-        return {"transcripts": []}
-    
-    transcripts = []
-    for f in sorted(transcript_dir.glob("*.txt"), reverse=True):
-        transcripts.append({
-            "filename": f.name,
-            "created": datetime.fromtimestamp(f.stat().st_mtime).isoformat(),
-            "size": f.stat().st_size
-        })
-    return {"transcripts": transcripts}
 
-@app.get("/api/transcripts/{filename}")
-def get_transcript(filename: str):
-    """Get a specific transcript content"""
-    transcript_dir = Path(__file__).parent / "transcripts"
-    filepath = transcript_dir / filename
+# Database API Endpoints
+@app.get("/api/calls")
+def list_calls():
+    """List recent calls from database"""
+    try:
+        calls = call_service.get_recent_calls(limit=50)
+        return {
+            "calls": [
+                {
+                    "id": c.id,
+                    "provider": c.call_provider,
+                    "start_time": c.start_time.isoformat() if c.start_time else None,
+                    "end_time": c.end_time.isoformat() if c.end_time else None,
+                    "duration": c.duration_seconds,
+                    "end_reason": c.end_reason
+                }
+                for c in calls
+            ]
+        }
+    except Exception as e:
+        return {"error": str(e), "calls": []}
+
+
+@app.get("/api/calls/{call_id}")
+def get_call(call_id: str):
+    """Get a specific call with its transcript"""
+    try:
+        call = call_service.get_call(call_id)
+        if not call:
+            return {"error": "Call not found"}
+        
+        # Get full transcript content
+        transcript_content = call_service.get_call_transcript(call_id)
+        
+        return {
+            "id": call.id,
+            "provider": call.call_provider,
+            "start_time": call.start_time.isoformat() if call.start_time else None,
+            "end_time": call.end_time.isoformat() if call.end_time else None,
+            "duration": call.duration_seconds,
+            "end_reason": call.end_reason,
+            "transcript": transcript_content
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# ============================================
+# Agent Configuration API Endpoints
+# ============================================
+
+@app.get("/api/agent/config")
+def get_agent_config():
+    """Get complete agent configuration"""
+    speech = agent_config_service.get_speech_settings()
+    kbs = agent_config_service.get_knowledge_bases()
     
-    if not filepath.exists() or not filepath.is_file():
-        return {"error": "Transcript not found"}
+    return {
+        "speech_settings": {
+            "recognition_language": speech.recognition_language,
+            "synthesis_voice_name": speech.synthesis_voice_name
+        },
+        "system_prompt": agent_config_service.get_system_prompt(),
+        "active_knowledge_base_id": agent_config_service.config.active_knowledge_base_id,
+        "knowledge_bases": [
+            {
+                "id": kb.id,
+                "name": kb.name,
+                "filename": kb.filename,
+                "created_at": kb.created_at,
+                "chunk_count": kb.chunk_count
+            }
+            for kb in kbs
+        ]
+    }
+
+
+@app.get("/api/agent/system-prompt")
+def get_system_prompt():
+    """Get current system prompt"""
+    return {
+        "system_prompt": agent_config_service.get_system_prompt()
+    }
+
+
+@app.post("/api/agent/system-prompt")
+def update_system_prompt(update: SystemPromptUpdate):
+    """Update system prompt"""
+    prompt = agent_config_service.update_system_prompt(update.system_prompt)
+    print(f"📝 System prompt updated ({len(prompt)} chars)")
+    return {
+        "system_prompt": prompt
+    }
+
+
+@app.post("/api/agent/system-prompt/reset")
+def reset_system_prompt():
+    """Reset system prompt to default"""
+    prompt = agent_config_service.reset_system_prompt()
+    print("📝 System prompt reset to default")
+    return {
+        "system_prompt": prompt
+    }
+
+
+@app.get("/api/agent/speech")
+def get_speech_settings():
+    """Get current speech settings"""
+    speech = agent_config_service.get_speech_settings()
+    return {
+        "recognition_language": speech.recognition_language,
+        "synthesis_voice_name": speech.synthesis_voice_name
+    }
+
+
+@app.post("/api/agent/speech")
+def update_speech_settings_api(update: SpeechSettingsUpdate):
+    """Update speech settings"""
+    # Update config service
+    speech = agent_config_service.update_speech_settings(
+        recognition_language=update.recognition_language,
+        synthesis_voice_name=update.synthesis_voice_name
+    )
     
-    with open(filepath, "r", encoding="utf-8") as f:
-        content = f.read()
+    # Update runtime speech service
+    update_speech_settings(
+        recognition_language=update.recognition_language,
+        synthesis_voice=update.synthesis_voice_name
+    )
     
-    return {"filename": filename, "content": content}
+    print(f"🗣️ Speech settings updated: lang={speech.recognition_language}, voice={speech.synthesis_voice_name}")
+    
+    return {
+        "recognition_language": speech.recognition_language,
+        "synthesis_voice_name": speech.synthesis_voice_name
+    }
+
+
+@app.get("/api/agent/knowledge-bases")
+def list_knowledge_bases():
+    """List all knowledge bases"""
+    kbs = agent_config_service.get_knowledge_bases()
+    active_id = agent_config_service.config.active_knowledge_base_id
+    
+    return {
+        "knowledge_bases": [
+            {
+                "id": kb.id,
+                "name": kb.name,
+                "filename": kb.filename,
+                "created_at": kb.created_at,
+                "chunk_count": kb.chunk_count,
+                "is_active": kb.id == active_id
+            }
+            for kb in kbs
+        ],
+        "active_id": active_id
+    }
+
+
+@app.post("/api/agent/knowledge-bases")
+async def create_knowledge_base(
+    file: UploadFile = File(...),
+    name: str = Form(...)
+):
+    """Upload a PDF/TXT file and create a new knowledge base"""
+    try:
+        # Generate unique ID
+        kb_id = str(uuid.uuid4())[:8]
+        
+        # Read file content
+        content = await file.read()
+        filename = file.filename or "uploaded_file"
+        
+        # Save the original file
+        file_path = get_kb_file_path(kb_id, filename)
+        with open(file_path, 'wb') as f:
+            f.write(content)
+        
+        # Extract text based on file type
+        text_content = ""
+        if filename.lower().endswith('.pdf'):
+            try:
+                import fitz  # PyMuPDF
+                pdf_doc = fitz.open(stream=content, filetype="pdf")
+                for page in pdf_doc:
+                    text_content += page.get_text()
+                pdf_doc.close()
+            except ImportError:
+                # Fallback: try with pdfplumber
+                try:
+                    import pdfplumber
+                    import io
+                    with pdfplumber.open(io.BytesIO(content)) as pdf:
+                        for page in pdf.pages:
+                            text_content += page.extract_text() or ""
+                except ImportError:
+                    return {"error": "PDF processing library not installed. Install pymupdf or pdfplumber."}
+        elif filename.lower().endswith('.txt') or filename.lower().endswith('.md'):
+            text_content = content.decode('utf-8', errors='ignore')
+        else:
+            return {"error": f"Unsupported file type: {filename}. Supported: .pdf, .txt, .md"}
+        
+        if not text_content.strip():
+            return {"error": "Could not extract text from file"}
+        
+        # Create knowledge base in vector store
+        chunk_count = create_knowledge_base_from_text(kb_id, name, text_content)
+        
+        # Save to config
+        kb = agent_config_service.add_knowledge_base(
+            kb_id=kb_id,
+            name=name,
+            filename=filename,
+            chunk_count=chunk_count
+        )
+        
+        print(f"📚 Created knowledge base: {name} ({kb_id}) with {chunk_count} chunks")
+        
+        return {
+            "success": True,
+            "knowledge_base": {
+                "id": kb.id,
+                "name": kb.name,
+                "filename": kb.filename,
+                "created_at": kb.created_at,
+                "chunk_count": kb.chunk_count
+            }
+        }
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"error": str(e)}
+
+
+@app.post("/api/agent/knowledge-bases/{kb_id}/activate")
+def activate_knowledge_base(kb_id: str):
+    """Set a knowledge base as active"""
+    success = agent_config_service.set_active_knowledge_base(kb_id)
+    
+    if success:
+        # Update vector store to use this KB
+        set_active_knowledge_base(kb_id)
+        print(f"📚 Activated knowledge base: {kb_id}")
+        return {"success": True, "active_id": kb_id}
+    else:
+        return {"error": "Knowledge base not found"}
+
+
+@app.post("/api/agent/knowledge-bases/deactivate")
+def deactivate_knowledge_base():
+    """Deactivate custom knowledge base, use default"""
+    agent_config_service.set_active_knowledge_base(None)
+    set_active_knowledge_base(None)
+    print("📚 Deactivated custom knowledge base, using default")
+    return {"success": True, "active_id": None}
+
+
+@app.delete("/api/agent/knowledge-bases/{kb_id}")
+def delete_knowledge_base(kb_id: str):
+    """Delete a knowledge base"""
+    # Delete from vector store
+    delete_kb_collection(kb_id)
+    
+    # Get file info before deleting config
+    kbs = agent_config_service.get_knowledge_bases()
+    file_to_delete = None
+    for kb in kbs:
+        if kb.id == kb_id:
+            file_to_delete = get_kb_file_path(kb_id, kb.filename)
+            break
+    
+    # Delete from config
+    success = agent_config_service.delete_knowledge_base(kb_id)
+    
+    # Delete the file
+    if file_to_delete and file_to_delete.exists():
+        try:
+            file_to_delete.unlink()
+        except:
+            pass
+    
+    if success:
+        print(f"🗑️ Deleted knowledge base: {kb_id}")
+        return {"success": True}
+    else:
+        return {"error": "Knowledge base not found"}
+
+
+@app.get("/api/agent/voices")
+def get_available_voices():
+    """Get list of available Azure Speech voices"""
+    # Common Azure voices for different languages
+    voices = [
+        # English - India
+        {"id": "en-IN-NeerjaNeural", "name": "Neerja (Indian English, Female)", "language": "en-IN"},
+        {"id": "en-IN-PrabhatNeural", "name": "Prabhat (Indian English, Male)", "language": "en-IN"},
+        # English - US
+        {"id": "en-US-JennyNeural", "name": "Jenny (US English, Female)", "language": "en-US"},
+        {"id": "en-US-GuyNeural", "name": "Guy (US English, Male)", "language": "en-US"},
+        {"id": "en-US-AriaNeural", "name": "Aria (US English, Female)", "language": "en-US"},
+        # English - UK
+        {"id": "en-GB-SoniaNeural", "name": "Sonia (British English, Female)", "language": "en-GB"},
+        {"id": "en-GB-RyanNeural", "name": "Ryan (British English, Male)", "language": "en-GB"},
+        # Hindi
+        {"id": "hi-IN-SwaraNeural", "name": "Swara (Hindi, Female)", "language": "hi-IN"},
+        {"id": "hi-IN-MadhurNeural", "name": "Madhur (Hindi, Male)", "language": "hi-IN"},
+        # Spanish
+        {"id": "es-ES-ElviraNeural", "name": "Elvira (Spanish, Female)", "language": "es-ES"},
+        {"id": "es-MX-DaliaNeural", "name": "Dalia (Mexican Spanish, Female)", "language": "es-MX"},
+        # French
+        {"id": "fr-FR-DeniseNeural", "name": "Denise (French, Female)", "language": "fr-FR"},
+        # German
+        {"id": "de-DE-KatjaNeural", "name": "Katja (German, Female)", "language": "de-DE"},
+        # Japanese
+        {"id": "ja-JP-NanamiNeural", "name": "Nanami (Japanese, Female)", "language": "ja-JP"},
+        # Chinese
+        {"id": "zh-CN-XiaoxiaoNeural", "name": "Xiaoxiao (Chinese, Female)", "language": "zh-CN"},
+    ]
+    
+    languages = [
+        {"id": "en-IN", "name": "English (India)"},
+        {"id": "en-US", "name": "English (US)"},
+        {"id": "en-GB", "name": "English (UK)"},
+        {"id": "hi-IN", "name": "Hindi (India)"},
+        {"id": "es-ES", "name": "Spanish (Spain)"},
+        {"id": "es-MX", "name": "Spanish (Mexico)"},
+        {"id": "fr-FR", "name": "French (France)"},
+        {"id": "de-DE", "name": "German (Germany)"},
+        {"id": "ja-JP", "name": "Japanese (Japan)"},
+        {"id": "zh-CN", "name": "Chinese (Mainland)"},
+    ]
+    
+    return {"voices": voices, "languages": languages}
 
 # Keywords that indicate user wants to end call
 END_CALL_KEYWORDS = [
@@ -159,30 +525,25 @@ Your response (END or CONTINUE):"""
         return False
 
 
-def save_transcript(transcript: list, call_duration: float):
-    """Save call transcript to file"""
-    # Create transcripts directory if it doesn't exist
-    transcript_dir = Path(__file__).parent / "transcripts"
-    transcript_dir.mkdir(exist_ok=True)
+def save_transcript(transcript: list, call_duration: float, call_id: str = None, end_reason: str = None):
+    """Save call transcript to database only"""
     
-    # Generate filename with timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = transcript_dir / f"call_{timestamp}.txt"
-    
-    # Format transcript
+    # Format transcript content
     content = []
     content.append("=" * 60)
     content.append(f"CALL TRANSCRIPT")
     content.append(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     content.append(f"Duration: {call_duration:.1f} seconds")
+    if call_id:
+        content.append(f"Call ID: {call_id}")
     content.append("=" * 60)
     content.append("")
     
     for entry in transcript:
         role = entry["role"].upper()
         text = entry["text"]
-        timestamp = entry["timestamp"]
-        content.append(f"[{timestamp}] {role}:")
+        ts = entry.get("timestamp", "")
+        content.append(f"[{ts}] {role}:")
         content.append(f"  {text}")
         content.append("")
     
@@ -190,12 +551,29 @@ def save_transcript(transcript: list, call_duration: float):
     content.append("END OF TRANSCRIPT")
     content.append("=" * 60)
     
-    # Save to file
-    with open(filename, "w", encoding="utf-8") as f:
-        f.write("\n".join(content))
+    # Join content into single string
+    transcript_content = "\n".join(content)
     
-    print(f"📝 Transcript saved: {filename}")
-    return filename
+    # Save to database
+    if call_id:
+        try:
+            # Save the full formatted transcript content to database
+            call_service.save_transcript_content(call_id, transcript_content)
+            
+            # Update call end info
+            call_service.end_call(
+                call_id=call_id,
+                end_reason=end_reason or "unknown",
+                duration_seconds=int(call_duration)
+            )
+            
+            print(f"💾 Transcript saved to database: {call_id}")
+        except Exception as e:
+            print(f"⚠️ Could not save to database: {e}")
+    else:
+        print("⚠️ No call_id provided, transcript not saved")
+    
+    return call_id
 
 
 @app.get("/")
@@ -221,6 +599,15 @@ async def audio_ws(ws: WebSocket):
     call_ended = threading.Event()
     end_reason = [None]  # Mutable container for end reason
     
+    # Create call record in database
+    call_id = None
+    try:
+        call_record = call_service.create_call(call_provider="websocket")
+        call_id = call_record.id
+        print(f"📞 Call started with ID: {call_id}")
+    except Exception as e:
+        print(f"⚠️ Could not create call record: {e}")
+    
     # Silence monitoring task
     async def monitor_call_limits():
         """Monitor for silence timeout and max call duration"""
@@ -243,6 +630,10 @@ async def audio_ws(ws: WebSocket):
             # Don't count silence while agent is speaking or audio is still playing
             if not is_agent_speaking[0] and last_playback_complete_time[0] is not None:
                 silence_since_playback = current_time - last_playback_complete_time[0]
+                
+                # Debug log every 5 seconds
+                if int(silence_since_playback) % 5 == 0 and int(silence_since_playback) > 0:
+                    print(f"   ⏳ Silence: {int(silence_since_playback)}s / {settings.max_silence_duration}s")
                 
                 if silence_since_playback >= settings.max_silence_duration:
                     end_reason[0] = "silence_timeout"
@@ -483,8 +874,14 @@ async def audio_ws(ws: WebSocket):
         # Calculate call duration
         call_duration = time.time() - call_start_time
         
-        # Save transcript
+        # Save transcript to file and database
         if transcript:
-            save_transcript(transcript, call_duration)
+            save_transcript(transcript, call_duration, call_id=call_id, end_reason=end_reason[0])
+        elif call_id:
+            # No transcript but we have a call record - still update end info
+            try:
+                call_service.end_call(call_id, end_reason=end_reason[0] or "no_transcript", duration_seconds=int(call_duration))
+            except:
+                pass
         
         print(f"📞 Call ended. Duration: {call_duration:.1f}s, Reason: {end_reason[0]}")

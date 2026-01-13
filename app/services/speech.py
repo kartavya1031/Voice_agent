@@ -1,45 +1,79 @@
 import azure.cognitiveservices.speech as speechsdk
 from app.core.config import SPEECH_KEY, SPEECH_REGION
 
-speech_config = speechsdk.SpeechConfig(
-    subscription=SPEECH_KEY,
-    region=SPEECH_REGION
-)
+# Default speech settings
+DEFAULT_RECOGNITION_LANGUAGE = "en-IN"
+DEFAULT_SYNTHESIS_VOICE = "en-IN-NeerjaNeural"
 
-speech_config.speech_recognition_language = "en-IN"
-speech_config.speech_synthesis_voice_name = "en-IN-NeerjaNeural"
+# Current speech settings (can be changed dynamically)
+current_recognition_language = DEFAULT_RECOGNITION_LANGUAGE
+current_synthesis_voice = DEFAULT_SYNTHESIS_VOICE
 
-speech_config.set_property(
-    speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs,
-    "100"
-)
 
-speech_config.set_property(
-    speechsdk.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs,
-    "100"
-)
+def get_speech_config():
+    """Create a new speech config with current settings"""
+    config = speechsdk.SpeechConfig(
+        subscription=SPEECH_KEY,
+        region=SPEECH_REGION
+    )
+    config.speech_recognition_language = current_recognition_language
+    config.speech_synthesis_voice_name = current_synthesis_voice
+    config.set_property(
+        speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs,
+        "400"
+    )
+    config.set_property(
+        speechsdk.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs,
+        "400"
+    )
+    return config
+
+
+def update_speech_settings(recognition_language: str = None, synthesis_voice: str = None):
+    """Update speech settings dynamically"""
+    global current_recognition_language, current_synthesis_voice
+    
+    if recognition_language:
+        current_recognition_language = recognition_language
+        print(f"🗣️ Recognition language updated to: {recognition_language}")
+    
+    if synthesis_voice:
+        current_synthesis_voice = synthesis_voice
+        print(f"🔊 Synthesis voice updated to: {synthesis_voice}")
+
+
+def get_current_speech_settings():
+    """Get current speech settings"""
+    return {
+        "recognition_language": current_recognition_language,
+        "synthesis_voice": current_synthesis_voice
+    }
+
+
+# Legacy speech_config for backward compatibility (recreate on each use)
+speech_config = get_speech_config()
+
 
 def create_continuous_recognizer():
-    return speechsdk.SpeechRecognizer(speech_config=speech_config)
-
-
+    config = get_speech_config()
+    return speechsdk.SpeechRecognizer(speech_config=config)
 def speak_text(text: str):
     """
     Speak text directly using system speaker
     """
+    config = get_speech_config()
     synthesizer = speechsdk.SpeechSynthesizer(
-        speech_config=speech_config
+        speech_config=config
     )
     synthesizer.speak_text_async(text).get()
-
-
 def text_to_speech(text: str) -> bytes:
     """
     Convert text to speech and return audio bytes
     """
+    config = get_speech_config()
     # audio_config=None returns audio data directly without playing
     synthesizer = speechsdk.SpeechSynthesizer(
-        speech_config=speech_config,
+        speech_config=config,
         audio_config=None
     )
     result = synthesizer.speak_text_async(text).get()
@@ -49,29 +83,26 @@ def text_to_speech(text: str) -> bytes:
         return result.audio_data
     else:
         raise Exception(f"Speech synthesis failed: {result.reason}")
-
 def create_streaming_recognizer(on_text_callback):
     """
     Create Azure streaming STT recognizer that accepts PCM audio chunks.
     Calls on_text_callback(text) when speech is recognized.
     """
-
+    config = get_speech_config()
+    
     # Define audio format: 16kHz, 16-bit, mono PCM (must match client microphone settings)
     audio_format = speechsdk.audio.AudioStreamFormat(
         samples_per_second=16000,
         bits_per_sample=16,
         channels=1
     )
-
     # Push stream to feed external audio (WebSocket / Plivo)
     push_stream = speechsdk.audio.PushAudioInputStream(stream_format=audio_format)
     audio_config = speechsdk.audio.AudioConfig(stream=push_stream)
-
     recognizer = speechsdk.SpeechRecognizer(
-        speech_config=speech_config,
+        speech_config=config,
         audio_config=audio_config
     )
-
     def recognized(evt):
         print(f"✅ STT recognized: {repr(evt.result.text)}")
         if evt.result.reason == speechsdk.ResultReason.RecognizedSpeech:
@@ -89,7 +120,6 @@ def create_streaming_recognizer(on_text_callback):
     
     def session_stopped(evt):
         print("🛑 STT session stopped")
-
     recognizer.recognized.connect(recognized)
     recognizer.recognizing.connect(recognizing)
     recognizer.canceled.connect(canceled)
@@ -97,10 +127,7 @@ def create_streaming_recognizer(on_text_callback):
     recognizer.session_stopped.connect(session_stopped)
     
     recognizer.start_continuous_recognition()
-
     return recognizer, push_stream
-
-
 def text_to_speech_streaming(text: str):
     """
     Synthesize full audio for text, then yield in consistent-sized chunks.
@@ -108,16 +135,18 @@ def text_to_speech_streaming(text: str):
     """
     import time
     
+    config = get_speech_config()
+    
     print(f"    🎤 TTS synthesizing: {text[:50]}...")
     start_time = time.time()
     
     # Set output format - Raw PCM for direct playback
-    speech_config.set_speech_synthesis_output_format(
+    config.set_speech_synthesis_output_format(
         speechsdk.SpeechSynthesisOutputFormat.Raw16Khz16BitMonoPcm
     )
     
     synthesizer = speechsdk.SpeechSynthesizer(
-        speech_config=speech_config,
+        speech_config=config,
         audio_config=None
     )
     
@@ -139,8 +168,6 @@ def text_to_speech_streaming(text: str):
         if result.cancellation_details:
             print(f"    Error: {result.cancellation_details.error_details}")
         raise Exception(f"TTS failed: {result.reason}")
-
-
 def text_to_speech_sentence_streaming(llm_stream):
     """
     Stream LLM tokens and synthesize TTS sentence by sentence for low latency.

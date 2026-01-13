@@ -10,6 +10,7 @@ from app.core.config import (
     DEPLOYMENT_NAME
 )
 from app.services.vector_store import get_context_for_query
+from app.services.agent_config import agent_config_service
 
 client = AzureOpenAI(
     api_key=AZURE_OPENAI_KEY,
@@ -17,21 +18,10 @@ client = AzureOpenAI(
     api_version="2024-02-15-preview"
 )
 
-# System prompt for Anvenssa AI voice agent
-SYSTEM_PROMPT = """You are an AI voice assistant for Anvenssa.AI, a company specializing in AI solutions for businesses.
 
-Your role:
-- Answer questions about Anvenssa.AI, its products, services, and leadership
-- Help potential customers understand how AI can benefit their business
-- Be friendly, professional, and conversational
-- Keep responses concise and suitable for voice (2-3 sentences typically)
-- If you don't know something, offer to connect them with the sales team
-
-Contact Information:
-- Phone: +91 8956512955 (Mon-Fri, 10:00-7:00)
-- Email: sales@anvenssa.com
-
-Use the provided context to answer questions accurately. If the context doesn't contain relevant information, use your general knowledge but mention that the customer can contact sales for detailed information."""
+def get_system_prompt() -> str:
+    """Get the current system prompt from config"""
+    return agent_config_service.get_system_prompt()
 
 
 def build_prompt_with_context(user_query: str) -> list[dict]:
@@ -39,16 +29,19 @@ def build_prompt_with_context(user_query: str) -> list[dict]:
     # Get relevant context from knowledge base
     context = get_context_for_query(user_query)
     
+    # Get current system prompt
+    system_prompt = get_system_prompt()
+    
     # Build system message with context
     if context:
-        system_content = f"""{SYSTEM_PROMPT}
+        system_content = f"""{system_prompt}
 
 RELEVANT CONTEXT FROM KNOWLEDGE BASE:
 {context}
 
 Remember to keep your response brief and conversational for voice interaction."""
     else:
-        system_content = SYSTEM_PROMPT
+        system_content = system_prompt
     
     return [
         {"role": "system", "content": system_content},
