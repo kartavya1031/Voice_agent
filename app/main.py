@@ -594,7 +594,9 @@ async def audio_ws(ws: WebSocket):
     call_start_time = time.time()
     last_activity_time = time.time()
     last_playback_complete_time = [None]  # Track when CLIENT finishes playing audio
-    is_agent_speaking = [False]  # Track if agent is currently responding
+    is_agent_generating = [False]  # Track if server is generating/sending audio
+    is_client_playing = [False]  # Track if client is playing audio
+    audio_end_sent = [False]  # Track if we've sent audio_end for current response
     transcript = []
     call_ended = threading.Event()
     end_reason = [None]  # Mutable container for end reason
@@ -626,9 +628,11 @@ async def audio_ws(ws: WebSocket):
                 print(f"⏱️ Call ended: Maximum duration ({settings.max_call_duration}s) reached")
                 break
             
-            # Check silence timeout - ONLY after CLIENT finishes playing audio
-            # Don't count silence while agent is speaking or audio is still playing
-            if not is_agent_speaking[0] and last_playback_complete_time[0] is not None:
+            # Check silence timeout - ONLY after:
+            # 1. Server finished sending audio (audio_end_sent)
+            # 2. Client confirmed playback complete (last_playback_complete_time set)
+            # 3. Not currently generating new response (is_agent_generating is False)
+            if not is_agent_generating[0] and not is_client_playing[0] and last_playback_complete_time[0] is not None:
                 silence_since_playback = current_time - last_playback_complete_time[0]
                 
                 # Debug log every 5 seconds
@@ -692,42 +696,83 @@ async def audio_ws(ws: WebSocket):
         try:
             print("🔄 Starting processing...")
             
-            # Mark that agent is speaking (silence timer should pause)
-            is_agent_speaking[0] = True
+            # Mark that agent is generating (barge-in should be enabled)
+            is_agent_generating[0] = True
+            is_client_playing[0] = True  # Will be playing soon
+            audio_end_sent[0] = False
             last_playback_complete_time[0] = None  # Reset until client finishes playback
             
             audio_queue = queue.Queue()
             processing_done = threading.Event()
             agent_response = []  # Collect full response for transcript
             
+            # Timing metrics
+            processing_start_time = time.time()
+            first_token_time = [None]
+            first_audio_time = [None]
+            llm_end_time = [None]
+            
             def process_pipeline():
                 """Background thread: LLM → sentence detection → TTS → audio queue"""
                 try:
                     sentence_buffer = ""
+                    # OPTIMIZED: Detect sentences on .!? OR on comma/colon if buffer is long enough
                     sentence_end_pattern = re.compile(r'[.!?]\s+')
+                    # Secondary pattern for early flush on commas (faster first audio)
+                    early_flush_pattern = re.compile(r'[,;:]\s+')
                     full_llm_response = ""
+                    token_count = [0]
+                    words_since_flush = [0]
 
-                    print("   🤖 LLM Streaming started...")
+                    print(f"   🤖 LLM Streaming started... (t=0ms)")
+                    llm_start = time.time()
+                    
                     for token in ask_ai_streaming(text):
                         if my_turn_id != current_turn_id:
                             print("⛔ Barge-in: Stopping LLM stream")
                             return
+                        
+                        # Track first token time (TTFT - Time To First Token)
+                        token_count[0] += 1
+                        if first_token_time[0] is None:
+                            first_token_time[0] = time.time()
+                            ttft = (first_token_time[0] - processing_start_time) * 1000
+                            print(f"   ⚡ LLM TTFT: {ttft:.0f}ms (first token received)")
 
                         sentence_buffer += token
                         full_llm_response += token
+                        words_since_flush[0] = len(sentence_buffer.split())
                         
+                        # Check for sentence end (.!?)
                         match = sentence_end_pattern.search(sentence_buffer)
+                        
+                        # OPTIMIZATION: Early flush on comma/colon if we have enough words (8+)
+                        # This gets first audio out faster
+                        if not match and words_since_flush[0] >= 8 and first_audio_time[0] is None:
+                            early_match = early_flush_pattern.search(sentence_buffer)
+                            if early_match:
+                                match = early_match  # Use the early match point
+                        
                         if match:
                             end_pos = match.end()
                             sentence = sentence_buffer[:end_pos].strip()
                             sentence_buffer = sentence_buffer[end_pos:]
+                            words_since_flush[0] = 0
                             
                             if sentence:
+                                tts_start = time.time()
                                 print(f"   🗣️ TTS: '{sentence}'")
                                 for audio_chunk in text_to_speech_streaming(sentence):
                                     if my_turn_id != current_turn_id:
                                         print("⛔ Barge-in: Stopping TTS")
                                         return
+                                    
+                                    # Track first audio chunk time
+                                    if first_audio_time[0] is None:
+                                        first_audio_time[0] = time.time()
+                                        first_audio_latency = (first_audio_time[0] - processing_start_time) * 1000
+                                        print(f"   🔊 First audio chunk ready: {first_audio_latency:.0f}ms from query")
+                                    
                                     audio_queue.put(audio_chunk)
 
                     # Handle remaining text
@@ -737,10 +782,19 @@ async def audio_ws(ws: WebSocket):
                         for audio_chunk in text_to_speech_streaming(remaining):
                             if my_turn_id != current_turn_id:
                                 return
+                            if first_audio_time[0] is None:
+                                first_audio_time[0] = time.time()
+                                first_audio_latency = (first_audio_time[0] - processing_start_time) * 1000
+                                print(f"   🔊 First audio chunk ready: {first_audio_latency:.0f}ms from query")
                             audio_queue.put(audio_chunk)
+                    
+                    llm_end_time[0] = time.time()
+                    llm_total = (llm_end_time[0] - llm_start) * 1000
+                    total_latency = (llm_end_time[0] - processing_start_time) * 1000
                     
                     agent_response.append(full_llm_response)
                     print(f"   ✅ Full response: {full_llm_response}")
+                    print(f"   📊 TIMING: LLM={llm_total:.0f}ms, Tokens={token_count[0]}, Total={total_latency:.0f}ms")
 
                 except Exception as e:
                     print(f"   ❌ Pipeline error: {e}")
@@ -785,10 +839,12 @@ async def audio_ws(ws: WebSocket):
             
             if my_turn_id == current_turn_id:
                 await ws.send_json({"type": "audio_end"})
+                audio_end_sent[0] = True
                 print(f"✅ Sent {chunk_count} audio chunks")
                 
-                # Mark that agent finished sending - but silence timer starts when client confirms playback complete
-                is_agent_speaking[0] = False
+                # Mark that server finished generating - client still playing
+                # is_client_playing remains True until playback_complete received
+                is_agent_generating[0] = False
                 print(f"   📤 All audio sent, waiting for client playback to finish...")
                 
                 # Add agent response to transcript
@@ -805,15 +861,17 @@ async def audio_ws(ws: WebSocket):
                         end_reason[0] = "conversation_complete"
                         call_ended.set()
             else:
-                # Barge-in happened - still mark as not speaking
-                is_agent_speaking[0] = False
+                # Barge-in happened - reset all flags
+                is_agent_generating[0] = False
+                is_client_playing[0] = False
             
         except Exception as e:
             print(f"❌ Error in on_text: {type(e).__name__}: {e}")
             import traceback
             traceback.print_exc()
-            # Ensure flag is reset on error
-            is_agent_speaking[0] = False
+            # Ensure flags are reset on error
+            is_agent_generating[0] = False
+            is_client_playing[0] = False
 
     def on_text_callback(text: str):
         global current_turn_id
@@ -824,7 +882,30 @@ async def audio_ws(ws: WebSocket):
         
         asyncio.run_coroutine_threadsafe(on_text(text, my_turn_id), loop)
 
-    recognizer, audio_stream = create_streaming_recognizer(on_text_callback)
+    def on_barge_in_callback():
+        """Called when STT detects partial speech - immediately interrupt TTS"""
+        global current_turn_id
+        
+        # Trigger barge-in if agent is generating OR client is still playing audio
+        if is_agent_generating[0] or is_client_playing[0]:
+            with current_turn_lock:
+                current_turn_id += 1
+            
+            # Reset client playing state - we're interrupting
+            is_client_playing[0] = False
+            
+            print("⚡ BARGE-IN: User started speaking, interrupting agent")
+            
+            # Send barge-in signal to client to stop playback immediately
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    ws.send_json({"type": "barge_in"}),
+                    loop
+                )
+            except Exception as e:
+                print(f"   ⚠️ Could not send barge_in signal: {e}")
+
+    recognizer, audio_stream = create_streaming_recognizer(on_text_callback, on_barge_in_callback)
     
     # Start call limit monitor
     monitor_task = asyncio.create_task(monitor_call_limits())
@@ -840,9 +921,14 @@ async def audio_ws(ws: WebSocket):
                     audio_stream.write(pcm)
                 
                 elif msg["type"] == "playback_complete":
-                    # Client finished playing all audio - NOW start silence timer
-                    last_playback_complete_time[0] = time.time()
-                    print(f"   🔈 Client playback complete - silence timer started ({settings.max_silence_duration}s)")
+                    # Client finished playing all audio
+                    is_client_playing[0] = False
+                    
+                    # Only start silence timer if server also finished sending audio
+                    # (Don't start timer if new audio is being generated)
+                    if audio_end_sent[0] and not is_agent_generating[0]:
+                        last_playback_complete_time[0] = time.time()
+                        print(f"   🔈 Client playback complete - silence timer started ({settings.max_silence_duration}s)")
                     
             except asyncio.TimeoutError:
                 # Normal timeout, just check the loop condition

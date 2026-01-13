@@ -7,10 +7,10 @@
   "active_knowledge_base_id": null,
   "knowledge_bases": [
     {
-      "id": "b73f0274",
-      "name": "sssss",
+      "id": "9409a82d",
+      "name": "ezee",
       "filename": "kb.pdf",
-      "created_at": "2026-01-12T15:47:30.943401",
+      "created_at": "2026-01-13T13:56:11.295351",
       "chunk_count": 7
     }
   ]

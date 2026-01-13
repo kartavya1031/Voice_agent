@@ -11,8 +11,11 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-# Use sentence-transformers for embeddings (runs locally, fast)
-EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+from app.core.config import (
+    AZURE_OPENAI_KEY,
+    AZURE_OPENAI_ENDPOINT,
+    AZURE_EMBEDDING_DEPLOYMENT_NAME
+)
 
 # Persist directory for ChromaDB
 PERSIST_DIR = Path(__file__).parent.parent / "data" / "chroma_db"
@@ -24,9 +27,18 @@ KB_FILES_DIR.mkdir(parents=True, exist_ok=True)
 # Initialize ChromaDB client
 client = chromadb.PersistentClient(path=str(PERSIST_DIR))
 
-# Use sentence-transformers embedding function
-embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-    model_name=EMBEDDING_MODEL
+# Extract base endpoint (remove the /deployments/... part if present)
+base_endpoint = AZURE_OPENAI_ENDPOINT
+if "/openai/deployments/" in base_endpoint:
+    base_endpoint = base_endpoint.split("/openai/deployments/")[0]
+
+# Use Azure OpenAI embedding function (much faster than local model)
+embedding_fn = embedding_functions.OpenAIEmbeddingFunction(
+    api_key=AZURE_OPENAI_KEY,
+    api_base=base_endpoint,
+    api_type="azure",
+    api_version="2023-05-15",
+    deployment_id=AZURE_EMBEDDING_DEPLOYMENT_NAME  # Use deployment_id for Azure
 )
 
 # Default collection for backward compatibility
@@ -195,9 +207,30 @@ def load_knowledge_base():
     return True
 
 
-def search_knowledge(query: str, n_results: int = 3) -> list[str]:
-    """Search active knowledge base for relevant context"""
-    global active_collection
+# LRU Cache for search results (avoids repeated embedding+search for same query)
+from functools import lru_cache
+import hashlib
+
+# Cache key generator (includes active KB ID for proper cache isolation)
+def _get_cache_key(query: str) -> str:
+    """Generate cache key including active KB"""
+    key = f"{active_kb_id or 'default'}:{query.lower().strip()}"
+    return hashlib.md5(key.encode()).hexdigest()
+
+# Cache for recent queries (50 entries)
+_search_cache = {}
+_cache_max_size = 50
+
+
+def search_knowledge(query: str, n_results: int = 2) -> list[str]:
+    """Search active knowledge base for relevant context (with caching)"""
+    global active_collection, _search_cache
+    
+    # Check cache first
+    cache_key = _get_cache_key(query)
+    if cache_key in _search_cache:
+        print(f"   💨 RAG cache hit!")
+        return _search_cache[cache_key]
     
     # Use active collection (could be default or custom KB)
     target_collection = active_collection
@@ -210,25 +243,37 @@ def search_knowledge(query: str, n_results: int = 3) -> list[str]:
     if target_collection.count() == 0:
         return []
     
+    # Reduced n_results from 3 to 2 for speed
     results = target_collection.query(
         query_texts=[query],
         n_results=n_results
     )
     
+    result_docs = []
     if results and results['documents']:
-        return results['documents'][0]
+        result_docs = results['documents'][0]
     
-    return []
+    # Cache the result
+    if len(_search_cache) >= _cache_max_size:
+        # Remove oldest entry (simple FIFO)
+        oldest_key = next(iter(_search_cache))
+        del _search_cache[oldest_key]
+    _search_cache[cache_key] = result_docs
+    
+    return result_docs
 
 
 def get_context_for_query(query: str) -> str:
     """Get formatted context string for LLM prompt"""
-    relevant_chunks = search_knowledge(query, n_results=3)
+    relevant_chunks = search_knowledge(query, n_results=2)
     
     if not relevant_chunks:
         return ""
     
-    context = "\n\n---\n\n".join(relevant_chunks)
+    # Limit context size for speed (max 600 chars total)
+    context = "\n---\n".join(relevant_chunks)
+    if len(context) > 600:
+        context = context[:600] + "..."
     return context
 
 

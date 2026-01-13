@@ -83,10 +83,11 @@ def text_to_speech(text: str) -> bytes:
         return result.audio_data
     else:
         raise Exception(f"Speech synthesis failed: {result.reason}")
-def create_streaming_recognizer(on_text_callback):
+def create_streaming_recognizer(on_text_callback, on_barge_in_callback=None):
     """
     Create Azure streaming STT recognizer that accepts PCM audio chunks.
     Calls on_text_callback(text) when speech is recognized.
+    Calls on_barge_in_callback() when partial speech is detected (for barge-in).
     """
     config = get_speech_config()
     
@@ -103,13 +104,18 @@ def create_streaming_recognizer(on_text_callback):
         speech_config=config,
         audio_config=audio_config
     )
+    
     def recognized(evt):
         print(f"✅ STT recognized: {repr(evt.result.text)}")
         if evt.result.reason == speechsdk.ResultReason.RecognizedSpeech:
             on_text_callback(evt.result.text)
     
     def recognizing(evt):
-        print(f"🔄 STT recognizing (partial): {repr(evt.result.text)}")
+        text = evt.result.text
+        print(f"🔄 STT recognizing (partial): {repr(text)}")
+        # Trigger barge-in when user starts speaking (has at least some recognized text)
+        if on_barge_in_callback and text and len(text.strip()) > 0:
+            on_barge_in_callback()
     
     def canceled(evt):
         print(f"❌ STT canceled: {evt.result.cancellation_details.reason}")
@@ -120,6 +126,7 @@ def create_streaming_recognizer(on_text_callback):
     
     def session_stopped(evt):
         print("🛑 STT session stopped")
+    
     recognizer.recognized.connect(recognized)
     recognizer.recognizing.connect(recognizing)
     recognizer.canceled.connect(canceled)
@@ -128,12 +135,33 @@ def create_streaming_recognizer(on_text_callback):
     
     recognizer.start_continuous_recognition()
     return recognizer, push_stream
+
+
+# =============================================================================
+# TTS AUDIO CACHE - Cache synthesized audio for common phrases
+# Eliminates ~200ms TTS latency for repeated phrases
+# =============================================================================
+_tts_cache = {}
+_tts_cache_max_size = 30  # Cache up to 30 phrases
+
+
 def text_to_speech_streaming(text: str):
     """
     Synthesize full audio for text, then yield in consistent-sized chunks.
-    This is more reliable than real-time streaming as it prevents audio cutting.
+    OPTIMIZED: Caches audio for repeated phrases.
     """
     import time
+    global _tts_cache
+    
+    # Check cache first
+    cache_key = text.lower().strip()
+    if cache_key in _tts_cache:
+        print(f"    ⚡ TTS CACHE HIT: '{text[:30]}...' -> 0ms!")
+        audio_data = _tts_cache[cache_key]
+        chunk_size = 8192
+        for i in range(0, len(audio_data), chunk_size):
+            yield audio_data[i:i + chunk_size]
+        return
     
     config = get_speech_config()
     
@@ -157,6 +185,11 @@ def text_to_speech_streaming(text: str):
         audio_data = result.audio_data
         synthesis_time = time.time() - start_time
         print(f"    ✅ TTS done in {synthesis_time:.2f}s, {len(audio_data)} bytes")
+        
+        # Cache this audio for future use (only cache short phrases)
+        if len(text) < 100 and len(_tts_cache) < _tts_cache_max_size:
+            _tts_cache[cache_key] = audio_data
+            print(f"    💾 Cached TTS for: '{text[:30]}...'")
         
         # Yield in larger chunks (8KB = ~250ms of audio at 16kHz/16bit)
         # Larger chunks = smoother playback
