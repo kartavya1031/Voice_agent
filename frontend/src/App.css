@@ -886,3 +886,74 @@ body {
   font-size: 0.8rem;
   color: var(--text-muted);
 }
+
+/* Template Variables Styles */
+.template-variables-card {
+  margin-top: 16px;
+  border: 1px dashed var(--accent);
+  background: linear-gradient(135deg, rgba(196, 112, 79, 0.02), rgba(196, 112, 79, 0.05));
+}
+
+.card-icon.variables {
+  background: linear-gradient(135deg, #f59e0b, #fbbf24);
+}
+
+.variables-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.variable-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.variable-label {
+  min-width: 180px;
+  flex-shrink: 0;
+}
+
+.variable-name {
+  font-family: 'Fira Code', 'Monaco', monospace;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(196, 112, 79, 0.1);
+  padding: 6px 12px;
+  border-radius: 6px;
+}
+
+.variable-input {
+  flex: 1;
+  padding: 10px 14px;
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dark);
+  font-size: 0.95rem;
+  transition: all 0.2s;
+}
+
+.variable-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(196, 112, 79, 0.1);
+}
+
+.variable-input::placeholder {
+  color: var(--text-light);
+}
+
+@media (max-width: 768px) {
+  .variable-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  
+  .variable-label {
+    min-width: auto;
+  }
+}

@@ -20,7 +20,7 @@ function App() {
     const [savedTranscripts, setSavedTranscripts] = useState([])
     const [selectedTranscript, setSelectedTranscript] = useState(null)
     const [logs, setLogs] = useState([])
-    
+
     // Agent Configuration State
     const [activeView, setActiveView] = useState('home') // home, agent
     const [agentConfig, setAgentConfig] = useState({
@@ -30,7 +30,9 @@ function App() {
         },
         system_prompt: '',
         active_knowledge_base_id: null,
-        knowledge_bases: []
+        knowledge_bases: [],
+        prompt_variables: {},
+        detected_variables: []
     })
     const [availableVoices, setAvailableVoices] = useState([])
     const [availableLanguages, setAvailableLanguages] = useState([])
@@ -39,6 +41,10 @@ function App() {
     const [selectedFile, setSelectedFile] = useState(null)
     const [editingPrompt, setEditingPrompt] = useState('')
     const [savingPrompt, setSavingPrompt] = useState(false)
+    // Template Variables State
+    const [promptVariables, setPromptVariables] = useState({})
+    const [detectedVariables, setDetectedVariables] = useState([])
+    const [savingVariables, setSavingVariables] = useState(false)
     const fileInputRef = useRef(null)
     // Refs
     const wsRef = useRef(null)
@@ -350,6 +356,8 @@ function App() {
             const data = await res.json()
             setAgentConfig(data)
             setEditingPrompt(data.system_prompt || '')
+            setPromptVariables(data.prompt_variables || {})
+            setDetectedVariables(data.detected_variables || [])
         } catch (err) {
             addLog(`Error fetching agent config: ${err.message}`)
         }
@@ -477,6 +485,20 @@ function App() {
         }
     }
 
+    // Extract variables from prompt text (client-side)
+    const extractVariablesFromPrompt = (prompt) => {
+        const pattern = /\{(\w+)\}/g
+        const matches = [...prompt.matchAll(pattern)]
+        const unique = [...new Set(matches.map(m => m[1]))]
+        return unique
+    }
+
+    // Update detected variables when prompt changes
+    useEffect(() => {
+        const detected = extractVariablesFromPrompt(editingPrompt)
+        setDetectedVariables(detected)
+    }, [editingPrompt])
+
     // Update system prompt
     const updateSystemPrompt = async () => {
         if (!editingPrompt.trim()) {
@@ -496,6 +518,10 @@ function App() {
                 ...prev,
                 system_prompt: data.system_prompt
             }))
+            // Re-fetch to get updated detected variables
+            const configRes = await fetch(`${API_URL}/api/agent/config`)
+            const configData = await configRes.json()
+            setDetectedVariables(configData.detected_variables || [])
             addLog(`✅ System prompt updated`)
         } catch (err) {
             addLog(`Error updating system prompt: ${err.message}`)
@@ -519,12 +545,41 @@ function App() {
                 system_prompt: data.system_prompt
             }))
             setEditingPrompt(data.system_prompt)
+            setPromptVariables({})
+            setDetectedVariables(data.detected_variables || [])
             addLog(`✅ System prompt reset to default`)
         } catch (err) {
             addLog(`Error resetting system prompt: ${err.message}`)
         } finally {
             setSavingPrompt(false)
         }
+    }
+
+    // Save prompt variables
+    const savePromptVariables = async () => {
+        setSavingVariables(true)
+        try {
+            const res = await fetch(`${API_URL}/api/agent/prompt-variables`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ variables: promptVariables })
+            })
+            const data = await res.json()
+            setPromptVariables(data.variables || {})
+            addLog(`✅ Template variables saved`)
+        } catch (err) {
+            addLog(`Error saving variables: ${err.message}`)
+        } finally {
+            setSavingVariables(false)
+        }
+    }
+
+    // Update a single variable value
+    const updateVariableValue = (varName, value) => {
+        setPromptVariables(prev => ({
+            ...prev,
+            [varName]: value
+        }))
     }
 
     // Format duration
@@ -550,7 +605,7 @@ function App() {
                 </div>
                 <nav className="sidebar-nav">
                     <div className="nav-section">
-                        <div 
+                        <div
                             className={`nav-item ${activeView === 'home' ? 'active' : ''}`}
                             onClick={() => setActiveView('home')}
                         >
@@ -560,7 +615,7 @@ function App() {
                     </div>
                     <div className="nav-section">
                         <div className="nav-section-title">Dashboard</div>
-                        <div 
+                        <div
                             className={`nav-item ${activeView === 'agent' ? 'active' : ''}`}
                             onClick={() => setActiveView('agent')}
                         >
@@ -698,15 +753,15 @@ function App() {
                                             />
                                         </div>
                                         <div className="prompt-actions">
-                                            <button 
-                                                className="save-btn" 
+                                            <button
+                                                className="save-btn"
                                                 onClick={updateSystemPrompt}
                                                 disabled={savingPrompt || !editingPrompt.trim()}
                                             >
                                                 {savingPrompt ? '⏳ Saving...' : '💾 Save Prompt'}
                                             </button>
-                                            <button 
-                                                className="save-btn secondary" 
+                                            <button
+                                                className="save-btn secondary"
                                                 onClick={resetSystemPrompt}
                                                 disabled={savingPrompt}
                                             >
@@ -714,10 +769,53 @@ function App() {
                                             </button>
                                         </div>
                                         <div className="prompt-hint">
-                                            💡 Tip: The system prompt defines the agent's personality, role, and how it should respond. Keep it clear and specific.
+                                            💡 Tip: Use {'{variable_name}'} syntax to create dynamic variables. Example: {"Your name is {agent_name}"}
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* Template Variables Section - Only show if variables detected */}
+                                {detectedVariables.length > 0 && (
+                                    <div className="card template-variables-card">
+                                        <div className="card-header">
+                                            <div className="card-icon variables">📋</div>
+                                            <div>
+                                                <div className="card-title">Template Variables ({detectedVariables.length} detected)</div>
+                                                <div className="card-description">Set values for dynamic placeholders in your prompt</div>
+                                            </div>
+                                        </div>
+                                        <div className="card-content">
+                                            <div className="variables-grid">
+                                                {detectedVariables.map(varName => (
+                                                    <div key={varName} className="variable-row">
+                                                        <label className="variable-label">
+                                                            <span className="variable-name">{'{' + varName + '}'}</span>
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            value={promptVariables[varName] || ''}
+                                                            onChange={(e) => updateVariableValue(varName, e.target.value)}
+                                                            placeholder={`Enter value for ${varName}`}
+                                                            className="variable-input"
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="prompt-actions">
+                                                <button
+                                                    className="save-btn"
+                                                    onClick={savePromptVariables}
+                                                    disabled={savingVariables}
+                                                >
+                                                    {savingVariables ? '⏳ Saving...' : '💾 Save Variables'}
+                                                </button>
+                                            </div>
+                                            <div className="prompt-hint">
+                                                💡 These values will be automatically injected into the system prompt during calls.
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </section>
 
                             {/* Knowledge Base Section */}
@@ -758,8 +856,8 @@ function App() {
                                                     📎 {selectedFile.name}
                                                 </div>
                                             )}
-                                            <button 
-                                                className="save-btn" 
+                                            <button
+                                                className="save-btn"
                                                 onClick={uploadKnowledgeBase}
                                                 disabled={uploadingKB || !selectedFile || !newKBName.trim()}
                                             >
@@ -826,14 +924,14 @@ function App() {
                                                         </div>
                                                         <div className="kb-item-actions">
                                                             {kb.id !== agentConfig.active_knowledge_base_id && (
-                                                                <button 
+                                                                <button
                                                                     className="kb-action-btn activate"
                                                                     onClick={() => activateKnowledgeBase(kb.id)}
                                                                 >
                                                                     Activate
                                                                 </button>
                                                             )}
-                                                            <button 
+                                                            <button
                                                                 className="kb-action-btn delete"
                                                                 onClick={() => deleteKnowledgeBase(kb.id)}
                                                             >
@@ -851,146 +949,146 @@ function App() {
                     ) : (
                         /* Home View */
                         <>
-                    {/* Main Cards Section */}
-                    <section className="section">
-                        <h2 className="section-title">Voice Agent</h2>
-                        <div className="cards-grid">
-                            {/* Call Card */}
-                            <div className="card call-card">
-                                <button
-                                    className={`call-btn ${callStatus === 'active' ? 'active' : ''} ${callStatus === 'connecting' ? 'connecting' : ''}`}
-                                    onClick={toggleCall}
-                                    disabled={callStatus === 'connecting'}
-                                >
-                                    <span className="btn-icon">{callStatus === 'active' ? '📞' : '🎤'}</span>
-                                    <span className="btn-text">{getButtonText()}</span>
-                                </button>
-                                {callStatus === 'active' && (
-                                    <div className="call-info">
-                                        <div className="timer">{formatDuration(callDuration)}</div>
-                                        {isMicActive && <div className="mic-status"><span className="pulse-dot"></span> Listening...</div>}
+                            {/* Main Cards Section */}
+                            <section className="section">
+                                <h2 className="section-title">Voice Agent</h2>
+                                <div className="cards-grid">
+                                    {/* Call Card */}
+                                    <div className="card call-card">
+                                        <button
+                                            className={`call-btn ${callStatus === 'active' ? 'active' : ''} ${callStatus === 'connecting' ? 'connecting' : ''}`}
+                                            onClick={toggleCall}
+                                            disabled={callStatus === 'connecting'}
+                                        >
+                                            <span className="btn-icon">{callStatus === 'active' ? '📞' : '🎤'}</span>
+                                            <span className="btn-text">{getButtonText()}</span>
+                                        </button>
+                                        {callStatus === 'active' && (
+                                            <div className="call-info">
+                                                <div className="timer">{formatDuration(callDuration)}</div>
+                                                {isMicActive && <div className="mic-status"><span className="pulse-dot"></span> Listening...</div>}
+                                            </div>
+                                        )}
+                                        {callStatus === 'idle' && (
+                                            <div className="card-description" style={{ marginTop: '16px', textAlign: 'center' }}>
+                                                Click to start a voice conversation with the AI agent
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                                {callStatus === 'idle' && (
-                                    <div className="card-description" style={{ marginTop: '16px', textAlign: 'center' }}>
-                                        Click to start a voice conversation with the AI agent
-                                    </div>
-                                )}
-                            </div>
-                            {/* Settings Card */}
-                            <div className="card">
-                                <div className="card-header">
-                                    <div className="card-icon settings">⚙️</div>
-                                    <div>
-                                        <div className="card-title">Call Settings</div>
-                                        <div className="card-description">Configure call parameters</div>
-                                    </div>
-                                </div>
-                                <div className="card-content">
-                                    <div className="setting-row">
-                                        <label>Max Duration (seconds)</label>
-                                        <input
-                                            type="number"
-                                            value={localSettings.max_call_duration}
-                                            onChange={(e) => setLocalSettings({ ...localSettings, max_call_duration: parseInt(e.target.value) || 600 })}
-                                            min="60"
-                                            max="3600"
-                                        />
-                                    </div>
-                                    <div className="setting-row">
-                                        <label>Silence Timeout (seconds)</label>
-                                        <input
-                                            type="number"
-                                            value={localSettings.max_silence_duration}
-                                            onChange={(e) => setLocalSettings({ ...localSettings, max_silence_duration: parseInt(e.target.value) || 20 })}
-                                            min="5"
-                                            max="120"
-                                        />
-                                    </div>
-                                    <button className="save-btn" onClick={saveSettings}>
-                                        Save Settings
-                                    </button>
-                                </div>
-                            </div>
-                            {/* Activity Log Card */}
-                            <div className="card">
-                                <div className="card-header">
-                                    <div className="card-icon logs">📋</div>
-                                    <div>
-                                        <div className="card-title">Activity Log</div>
-                                        <div className="card-description">Real-time call events</div>
-                                    </div>
-                                </div>
-                                <div className="card-content">
-                                    <div className="logs-list">
-                                        {logs.length === 0 ? (
-                                            <div className="no-logs">No activity yet...</div>
-                                        ) : (
+                                    {/* Settings Card */}
+                                    <div className="card">
+                                        <div className="card-header">
+                                            <div className="card-icon settings">⚙️</div>
                                             <div>
-                                                {[...logs].reverse().map((log, i) => (
-                                                    <div key={i} className="log-item">{log}</div>
+                                                <div className="card-title">Call Settings</div>
+                                                <div className="card-description">Configure call parameters</div>
+                                            </div>
+                                        </div>
+                                        <div className="card-content">
+                                            <div className="setting-row">
+                                                <label>Max Duration (seconds)</label>
+                                                <input
+                                                    type="number"
+                                                    value={localSettings.max_call_duration}
+                                                    onChange={(e) => setLocalSettings({ ...localSettings, max_call_duration: parseInt(e.target.value) || 600 })}
+                                                    min="60"
+                                                    max="3600"
+                                                />
+                                            </div>
+                                            <div className="setting-row">
+                                                <label>Silence Timeout (seconds)</label>
+                                                <input
+                                                    type="number"
+                                                    value={localSettings.max_silence_duration}
+                                                    onChange={(e) => setLocalSettings({ ...localSettings, max_silence_duration: parseInt(e.target.value) || 20 })}
+                                                    min="5"
+                                                    max="120"
+                                                />
+                                            </div>
+                                            <button className="save-btn" onClick={saveSettings}>
+                                                Save Settings
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {/* Activity Log Card */}
+                                    <div className="card">
+                                        <div className="card-header">
+                                            <div className="card-icon logs">📋</div>
+                                            <div>
+                                                <div className="card-title">Activity Log</div>
+                                                <div className="card-description">Real-time call events</div>
+                                            </div>
+                                        </div>
+                                        <div className="card-content">
+                                            <div className="logs-list">
+                                                {logs.length === 0 ? (
+                                                    <div className="no-logs">No activity yet...</div>
+                                                ) : (
+                                                    <div>
+                                                        {[...logs].reverse().map((log, i) => (
+                                                            <div key={i} className="log-item">{log}</div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                            {/* Call History Section */}
+                            <section className="section">
+                                <h2 className="section-title">Call History</h2>
+                                <div className="card">
+                                    <div className="card-header">
+                                        <div className="card-icon history">📝</div>
+                                        <div>
+                                            <div className="card-title">Recent Calls</div>
+                                            <div className="card-description">View transcripts from previous conversations</div>
+                                        </div>
+                                    </div>
+                                    <div className="card-content">
+                                        {savedTranscripts.length === 0 ? (
+                                            <div className="no-logs">No calls recorded yet</div>
+                                        ) : (
+                                            <div className="history-grid">
+                                                {savedTranscripts.slice(0, 8).map((call, i) => (
+                                                    <div key={i} className="history-item" onClick={() => viewTranscript(call.id)}>
+                                                        <div className="history-id">📞 {call.id.substring(0, 8)}...</div>
+                                                        <div className="history-meta">
+                                                            {call.start_time ? new Date(call.start_time).toLocaleString() : 'Unknown'}
+                                                            {call.duration && ` • ${call.duration}s`}
+                                                        </div>
+                                                        {call.end_reason && <div className="history-reason">{call.end_reason}</div>}
+                                                    </div>
                                                 ))}
                                             </div>
                                         )}
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    </section>
-                    {/* Call History Section */}
-                    <section className="section">
-                        <h2 className="section-title">Call History</h2>
-                        <div className="card">
-                            <div className="card-header">
-                                <div className="card-icon history">📝</div>
-                                <div>
-                                    <div className="card-title">Recent Calls</div>
-                                    <div className="card-description">View transcripts from previous conversations</div>
+                            </section>
+                            {/* Quick Actions */}
+                            <div className="quick-actions">
+                                <div className="quick-action" onClick={() => setActiveView('agent')}>
+                                    <div className="quick-action-icon">🤖</div>
+                                    <div className="quick-action-title">Agent Config</div>
+                                    <div className="quick-action-desc">Voice & Knowledge</div>
+                                </div>
+                                <div className="quick-action">
+                                    <div className="quick-action-icon">📊</div>
+                                    <div className="quick-action-title">Analytics</div>
+                                    <div className="quick-action-desc">View call statistics</div>
+                                </div>
+                                <div className="quick-action">
+                                    <div className="quick-action-icon">✅</div>
+                                    <div className="quick-action-title">Status</div>
+                                    <div className="quick-action-desc">{isConnected ? 'System Online' : 'System Offline'}</div>
+                                </div>
+                                <div className="quick-action">
+                                    <div className="quick-action-icon">❓</div>
+                                    <div className="quick-action-title">Help Center</div>
+                                    <div className="quick-action-desc">Get support</div>
                                 </div>
                             </div>
-                            <div className="card-content">
-                                {savedTranscripts.length === 0 ? (
-                                    <div className="no-logs">No calls recorded yet</div>
-                                ) : (
-                                    <div className="history-grid">
-                                        {savedTranscripts.slice(0, 8).map((call, i) => (
-                                            <div key={i} className="history-item" onClick={() => viewTranscript(call.id)}>
-                                                <div className="history-id">📞 {call.id.substring(0, 8)}...</div>
-                                                <div className="history-meta">
-                                                    {call.start_time ? new Date(call.start_time).toLocaleString() : 'Unknown'}
-                                                    {call.duration && ` • ${call.duration}s`}
-                                                </div>
-                                                {call.end_reason && <div className="history-reason">{call.end_reason}</div>}
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </section>
-                    {/* Quick Actions */}
-                    <div className="quick-actions">
-                        <div className="quick-action" onClick={() => setActiveView('agent')}>
-                            <div className="quick-action-icon">🤖</div>
-                            <div className="quick-action-title">Agent Config</div>
-                            <div className="quick-action-desc">Voice & Knowledge</div>
-                        </div>
-                        <div className="quick-action">
-                            <div className="quick-action-icon">📊</div>
-                            <div className="quick-action-title">Analytics</div>
-                            <div className="quick-action-desc">View call statistics</div>
-                        </div>
-                        <div className="quick-action">
-                            <div className="quick-action-icon">✅</div>
-                            <div className="quick-action-title">Status</div>
-                            <div className="quick-action-desc">{isConnected ? 'System Online' : 'System Offline'}</div>
-                        </div>
-                        <div className="quick-action">
-                            <div className="quick-action-icon">❓</div>
-                            <div className="quick-action-title">Help Center</div>
-                            <div className="quick-action-desc">Get support</div>
-                        </div>
-                    </div>
                         </>
                     )}
                 </div>

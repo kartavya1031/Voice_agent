@@ -19,7 +19,7 @@ from typing import Optional, List
 current_turn_id = 0
 current_turn_lock = threading.Lock()
 
-from app.services.llm import ask_ai, ask_ai_streaming
+from app.services.llm import ask_ai, ask_ai_streaming, reset_conversation, add_to_conversation, clean_llm_output
 from app.services.speech import (
     text_to_speech,
     text_to_speech_streaming,
@@ -110,6 +110,9 @@ class SystemPromptUpdate(BaseModel):
 
 class SystemPromptResponse(BaseModel):
     system_prompt: str
+
+class PromptVariablesUpdate(BaseModel):
+    variables: dict
 
 
 # API Endpoints
@@ -208,7 +211,9 @@ def get_agent_config():
                 "chunk_count": kb.chunk_count
             }
             for kb in kbs
-        ]
+        ],
+        "prompt_variables": agent_config_service.get_prompt_variables(),
+        "detected_variables": agent_config_service.get_detected_variables()
     }
 
 
@@ -236,7 +241,29 @@ def reset_system_prompt():
     prompt = agent_config_service.reset_system_prompt()
     print("📝 System prompt reset to default")
     return {
-        "system_prompt": prompt
+        "system_prompt": prompt,
+        "prompt_variables": {},
+        "detected_variables": agent_config_service.get_detected_variables()
+    }
+
+
+@app.get("/api/agent/prompt-variables")
+def get_prompt_variables():
+    """Get current prompt variables and detected variable names"""
+    return {
+        "variables": agent_config_service.get_prompt_variables(),
+        "detected_variables": agent_config_service.get_detected_variables()
+    }
+
+
+@app.post("/api/agent/prompt-variables")
+def update_prompt_variables(update: PromptVariablesUpdate):
+    """Update prompt variable values"""
+    variables = agent_config_service.update_prompt_variables(update.variables)
+    print(f"📝 Prompt variables updated: {list(variables.keys())}")
+    return {
+        "variables": variables,
+        "detected_variables": agent_config_service.get_detected_variables()
     }
 
 
@@ -429,14 +456,19 @@ def delete_knowledge_base(kb_id: str):
 def get_available_voices():
     """Get list of available Azure Speech voices"""
     # Common Azure voices for different languages
+    # Added more natural-sounding and conversational voices
     voices = [
-        # English - India
-        {"id": "en-IN-NeerjaNeural", "name": "Neerja (Indian English, Female)", "language": "en-IN"},
+        # English - India (Most Natural)
+        {"id": "en-IN-NeerjaNeural", "name": "Neerja (Indian English, Female) ⭐ Recommended", "language": "en-IN"},
         {"id": "en-IN-PrabhatNeural", "name": "Prabhat (Indian English, Male)", "language": "en-IN"},
-        # English - US
-        {"id": "en-US-JennyNeural", "name": "Jenny (US English, Female)", "language": "en-US"},
+        # English - US (Very Natural)
+        {"id": "en-US-JennyNeural", "name": "Jenny (US English, Female) ⭐ Very Natural", "language": "en-US"},
+        {"id": "en-US-JennyMultilingualNeural", "name": "Jenny Multilingual (US, Female) ⭐ Most Natural", "language": "en-US"},
         {"id": "en-US-GuyNeural", "name": "Guy (US English, Male)", "language": "en-US"},
-        {"id": "en-US-AriaNeural", "name": "Aria (US English, Female)", "language": "en-US"},
+        {"id": "en-US-AriaNeural", "name": "Aria (US English, Female) ⭐ Conversational", "language": "en-US"},
+        {"id": "en-US-DavisNeural", "name": "Davis (US English, Male) ⭐ Warm", "language": "en-US"},
+        {"id": "en-US-JasonNeural", "name": "Jason (US English, Male)", "language": "en-US"},
+        {"id": "en-US-SaraNeural", "name": "Sara (US English, Female)", "language": "en-US"},
         # English - UK
         {"id": "en-GB-SoniaNeural", "name": "Sonia (British English, Female)", "language": "en-GB"},
         {"id": "en-GB-RyanNeural", "name": "Ryan (British English, Male)", "language": "en-GB"},
@@ -607,6 +639,9 @@ async def audio_ws(ws: WebSocket):
         call_record = call_service.create_call(call_provider="websocket")
         call_id = call_record.id
         print(f"📞 Call started with ID: {call_id}")
+        
+        # Reset conversation history for this new call
+        reset_conversation()
     except Exception as e:
         print(f"⚠️ Could not create call record: {e}")
     
@@ -666,6 +701,9 @@ async def audio_ws(ws: WebSocket):
             "timestamp": datetime.now().strftime("%H:%M:%S")
         })
         
+        # Add to conversation history for LLM context
+        add_to_conversation("user", text)
+        
         # Check for end intent (simple keyword check first)
         if detect_end_intent_simple(text):
             print("👋 End intent detected (keyword match)")
@@ -713,13 +751,21 @@ async def audio_ws(ws: WebSocket):
             llm_end_time = [None]
             
             def process_pipeline():
-                """Background thread: LLM → sentence detection → TTS → audio queue"""
+                """Background thread: LLM → sentence detection → TTS → audio queue
+                
+                OPTIMIZATIONS v2:
+                1. Aggressive early flush: trigger on comma/semicolon after just 5 words
+                2. Split long sentences (>15 words) at natural break points
+                3. Concurrent TTS preparation for upcoming sentences
+                """
                 try:
                     sentence_buffer = ""
-                    # OPTIMIZED: Detect sentences on .!? OR on comma/colon if buffer is long enough
-                    sentence_end_pattern = re.compile(r'[.!?]\s+')
+                    # OPTIMIZED: Detect sentences on .!? 
+                    sentence_end_pattern = re.compile(r'[.!?]\s*')
                     # Secondary pattern for early flush on commas (faster first audio)
                     early_flush_pattern = re.compile(r'[,;:]\s+')
+                    # Pattern to split very long sentences at natural break points
+                    long_sentence_break = re.compile(r'\s+(and|or|but|so|because|which|that|where|when)\s+', re.IGNORECASE)
                     full_llm_response = ""
                     token_count = [0]
                     words_since_flush = [0]
@@ -746,12 +792,20 @@ async def audio_ws(ws: WebSocket):
                         # Check for sentence end (.!?)
                         match = sentence_end_pattern.search(sentence_buffer)
                         
-                        # OPTIMIZATION: Early flush on comma/colon if we have enough words (8+)
-                        # This gets first audio out faster
-                        if not match and words_since_flush[0] >= 8 and first_audio_time[0] is None:
+                        # OPTIMIZATION v2: Early flush on comma/colon if we have 5+ words (reduced from 8)
+                        # This gets first audio out ~200ms faster
+                        if not match and words_since_flush[0] >= 5 and first_audio_time[0] is None:
                             early_match = early_flush_pattern.search(sentence_buffer)
                             if early_match:
                                 match = early_match  # Use the early match point
+                        
+                        # OPTIMIZATION v2: Also flush long buffers (15+ words) at conjunction breaks
+                        # This prevents very long TTS calls which are slow
+                        if not match and words_since_flush[0] >= 15:
+                            long_match = long_sentence_break.search(sentence_buffer)
+                            if long_match:
+                                # Split before the conjunction
+                                match = long_match
                         
                         if match:
                             end_pos = match.end()
@@ -760,6 +814,11 @@ async def audio_ws(ws: WebSocket):
                             words_since_flush[0] = 0
                             
                             if sentence:
+                                # Clean the sentence to remove meta-instructions
+                                sentence = clean_llm_output(sentence)
+                                if not sentence:  # Skip if cleaning removed everything
+                                    continue
+                                    
                                 tts_start = time.time()
                                 print(f"   🗣️ TTS: '{sentence}'")
                                 for audio_chunk in text_to_speech_streaming(sentence):
@@ -778,22 +837,27 @@ async def audio_ws(ws: WebSocket):
                     # Handle remaining text
                     remaining = sentence_buffer.strip()
                     if remaining:
-                        print(f"   🗣️ TTS final: '{remaining}'")
-                        for audio_chunk in text_to_speech_streaming(remaining):
-                            if my_turn_id != current_turn_id:
-                                return
-                            if first_audio_time[0] is None:
-                                first_audio_time[0] = time.time()
-                                first_audio_latency = (first_audio_time[0] - processing_start_time) * 1000
-                                print(f"   🔊 First audio chunk ready: {first_audio_latency:.0f}ms from query")
-                            audio_queue.put(audio_chunk)
+                        # Clean the remaining text
+                        remaining = clean_llm_output(remaining)
+                        if remaining:  # Only process if something remains after cleaning
+                            print(f"   🗣️ TTS final: '{remaining}'")
+                            for audio_chunk in text_to_speech_streaming(remaining):
+                                if my_turn_id != current_turn_id:
+                                    return
+                                if first_audio_time[0] is None:
+                                    first_audio_time[0] = time.time()
+                                    first_audio_latency = (first_audio_time[0] - processing_start_time) * 1000
+                                    print(f"   🔊 First audio chunk ready: {first_audio_latency:.0f}ms from query")
+                                audio_queue.put(audio_chunk)
                     
                     llm_end_time[0] = time.time()
                     llm_total = (llm_end_time[0] - llm_start) * 1000
                     total_latency = (llm_end_time[0] - processing_start_time) * 1000
                     
-                    agent_response.append(full_llm_response)
-                    print(f"   ✅ Full response: {full_llm_response}")
+                    # Store cleaned response for transcript
+                    cleaned_response = clean_llm_output(full_llm_response)
+                    agent_response.append(cleaned_response)
+                    print(f"   ✅ Full response: {cleaned_response}")
                     print(f"   📊 TIMING: LLM={llm_total:.0f}ms, Tokens={token_count[0]}, Total={total_latency:.0f}ms")
 
                 except Exception as e:
@@ -854,6 +918,9 @@ async def audio_ws(ws: WebSocket):
                         "text": agent_response[0],
                         "timestamp": datetime.now().strftime("%H:%M:%S")
                     })
+                    
+                    # Add to conversation history for LLM context
+                    add_to_conversation("assistant", agent_response[0])
                     
                     # Check if LLM response indicates end of conversation
                     if detect_end_intent_simple(agent_response[0]):

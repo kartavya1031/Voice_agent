@@ -5,30 +5,27 @@ Manages dynamic knowledge bases and speech settings
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Optional
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from datetime import datetime
 
 # Config file path
 CONFIG_DIR = Path(__file__).parent.parent / "data"
 CONFIG_FILE = CONFIG_DIR / "agent_config.json"
 
-# Default system prompt
-DEFAULT_SYSTEM_PROMPT = """You are an AI voice assistant for Anvenssa.AI, a company specializing in AI solutions for businesses.
+# Default system prompt - OPTIMIZED for short, fast voice responses
+DEFAULT_SYSTEM_PROMPT = """You are an AI voice assistant for Anvenssa.AI.
+
+IMPORTANT: Keep responses SHORT (under 25 words when possible). This is a voice call - long responses feel slow.
 
 Your role:
-- Answer questions about Anvenssa.AI, its products, services, and leadership
-- Help potential customers understand how AI can benefit their business
-- Be friendly, professional, and conversational
-- Keep responses concise and suitable for voice (2-3 sentences typically)
-- If you don't know something, offer to connect them with the sales team
+- Answer questions about Anvenssa.AI briefly and clearly
+- Be friendly and conversational
+- For complex topics, give a short answer then offer more details
 
-Contact Information:
-- Phone: +91 8956512955 (Mon-Fri, 10:00-7:00)
-- Email: sales@anvenssa.com
-
-Use the provided context to answer questions accurately. If the context doesn't contain relevant information, use your general knowledge but mention that the customer can contact sales for detailed information."""
+Contact: +91 8956512955 or sales@anvenssa.com"""
 
 
 @dataclass
@@ -50,12 +47,41 @@ class AgentConfig:
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
     active_knowledge_base_id: Optional[str] = None
     knowledge_bases: list = None
+    prompt_variables: dict = None  # Store variable values like {"agent_name": "Sarah"}
     
     def __post_init__(self):
         if self.knowledge_bases is None:
             self.knowledge_bases = []
+        if self.prompt_variables is None:
+            self.prompt_variables = {}
         if not self.system_prompt:
             self.system_prompt = DEFAULT_SYSTEM_PROMPT
+
+
+def extract_variables_from_prompt(prompt: str) -> list[str]:
+    """Extract all {variable_name} placeholders from prompt"""
+    pattern = r'\{(\w+)\}'
+    matches = re.findall(pattern, prompt)
+    # Return unique variable names while preserving order
+    seen = set()
+    unique = []
+    for var in matches:
+        if var not in seen:
+            seen.add(var)
+            unique.append(var)
+    return unique
+
+
+def substitute_variables(prompt: str, variables: dict) -> str:
+    """Replace {variable_name} placeholders with actual values"""
+    if not variables:
+        return prompt
+    
+    result = prompt
+    for key, value in variables.items():
+        if value:  # Only substitute if value is not empty
+            result = result.replace(f"{{{key}}}", str(value))
+    return result
 
 
 class AgentConfigService:
@@ -78,7 +104,8 @@ class AgentConfigService:
                     speech_settings=speech_settings,
                     system_prompt=data.get('system_prompt', DEFAULT_SYSTEM_PROMPT),
                     active_knowledge_base_id=data.get('active_knowledge_base_id'),
-                    knowledge_bases=knowledge_bases
+                    knowledge_bases=knowledge_bases,
+                    prompt_variables=data.get('prompt_variables', {})
                 )
             except Exception as e:
                 print(f"⚠️ Error loading agent config: {e}")
@@ -87,7 +114,8 @@ class AgentConfigService:
         return AgentConfig(
             speech_settings=SpeechSettings(),
             system_prompt=DEFAULT_SYSTEM_PROMPT,
-            knowledge_bases=[]
+            knowledge_bases=[],
+            prompt_variables={}
         )
     
     def _save_config(self):
@@ -98,7 +126,8 @@ class AgentConfigService:
             'speech_settings': asdict(self.config.speech_settings),
             'system_prompt': self.config.system_prompt,
             'active_knowledge_base_id': self.config.active_knowledge_base_id,
-            'knowledge_bases': [asdict(kb) for kb in self.config.knowledge_bases]
+            'knowledge_bases': [asdict(kb) for kb in self.config.knowledge_bases],
+            'prompt_variables': self.config.prompt_variables
         }
         
         with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
@@ -204,8 +233,30 @@ class AgentConfigService:
     def reset_system_prompt(self) -> str:
         """Reset system prompt to default"""
         self.config.system_prompt = DEFAULT_SYSTEM_PROMPT
+        self.config.prompt_variables = {}  # Clear variables on reset
         self._save_config()
         return self.config.system_prompt
+    
+    def get_prompt_variables(self) -> dict:
+        """Get current prompt variables"""
+        return self.config.prompt_variables
+    
+    def get_detected_variables(self) -> list[str]:
+        """Get list of variable names detected in current prompt"""
+        return extract_variables_from_prompt(self.config.system_prompt)
+    
+    def update_prompt_variables(self, variables: dict) -> dict:
+        """Update prompt variable values"""
+        self.config.prompt_variables = variables
+        self._save_config()
+        return self.config.prompt_variables
+    
+    def get_resolved_system_prompt(self) -> str:
+        """Get system prompt with variables substituted"""
+        return substitute_variables(
+            self.config.system_prompt,
+            self.config.prompt_variables
+        )
 
 
 # Global instance
