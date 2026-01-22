@@ -35,11 +35,9 @@ def update_speech_settings(recognition_language: str = None, synthesis_voice: st
     
     if recognition_language:
         current_recognition_language = recognition_language
-        print(f"🗣️ Recognition language updated to: {recognition_language}")
     
     if synthesis_voice:
         current_synthesis_voice = synthesis_voice
-        print(f"🔊 Synthesis voice updated to: {synthesis_voice}")
 
 
 def get_current_speech_settings():
@@ -83,7 +81,7 @@ def text_to_speech(text: str) -> bytes:
         return result.audio_data
     else:
         raise Exception(f"Speech synthesis failed: {result.reason}")
-def create_streaming_recognizer(on_text_callback, on_barge_in_callback=None):
+def create_streaming_recognizer(on_text_callback, on_barge_in_callback=None, sample_rate=16000):
     """
     Create Azure streaming STT recognizer that accepts PCM audio chunks.
     Calls on_text_callback(text) when speech is recognized.
@@ -91,9 +89,9 @@ def create_streaming_recognizer(on_text_callback, on_barge_in_callback=None):
     """
     config = get_speech_config()
     
-    # Define audio format: 16kHz, 16-bit, mono PCM (must match client microphone settings)
+    # Define audio format: sample_rate (default 16kHz), 16-bit, mono PCM
     audio_format = speechsdk.audio.AudioStreamFormat(
-        samples_per_second=16000,
+        samples_per_second=sample_rate,
         bits_per_sample=16,
         channels=1
     )
@@ -106,26 +104,23 @@ def create_streaming_recognizer(on_text_callback, on_barge_in_callback=None):
     )
     
     def recognized(evt):
-        print(f"✅ STT recognized: {repr(evt.result.text)}")
         if evt.result.reason == speechsdk.ResultReason.RecognizedSpeech:
             on_text_callback(evt.result.text)
     
     def recognizing(evt):
         text = evt.result.text
-        print(f"🔄 STT recognizing (partial): {repr(text)}")
-        # Trigger barge-in when user starts speaking (has at least some recognized text)
+        # Trigger barge-in when user starts speaking
         if on_barge_in_callback and text and len(text.strip()) > 0:
             on_barge_in_callback()
     
     def canceled(evt):
         print(f"❌ STT canceled: {evt.result.cancellation_details.reason}")
-        print(f"   Error details: {evt.result.cancellation_details.error_details}")
     
     def session_started(evt):
-        print("🎙️ STT session started")
+        pass
     
     def session_stopped(evt):
-        print("🛑 STT session stopped")
+        pass
     
     recognizer.recognized.connect(recognized)
     recognizer.recognizing.connect(recognizing)
@@ -154,20 +149,16 @@ def _get_synthesizer():
     global _synthesizer, _synthesizer_voice
     
     config = get_speech_config()
-    
-    # Set output format - Raw PCM for direct playback
     config.set_speech_synthesis_output_format(
         speechsdk.SpeechSynthesisOutputFormat.Raw16Khz16BitMonoPcm
     )
     
-    # Recreate synthesizer if voice changed
     if _synthesizer is None or _synthesizer_voice != current_synthesis_voice:
         _synthesizer = speechsdk.SpeechSynthesizer(
             speech_config=config,
             audio_config=None
         )
         _synthesizer_voice = current_synthesis_voice
-        print(f"    🔧 Created new synthesizer for voice: {current_synthesis_voice}")
     
     return _synthesizer
 
@@ -218,29 +209,19 @@ def _build_ssml(text: str, voice_name: str = None) -> str:
 def text_to_speech_streaming(text: str):
     """
     Synthesize full audio for text using SSML, then yield in consistent-sized chunks.
-    
-    OPTIMIZATIONS v3:
-    1. Cache audio for repeated phrases (0ms latency)
-    2. Use smaller chunks (2KB) for faster first audio delivery - 50% faster!
-    3. Limit TTS text to 120 chars max to prevent long synthesis times
-    4. SSML with prosody for natural-sounding voice
-    5. Reusable synthesizer for connection pooling
+    Uses caching and connection pooling for optimal performance.
     """
     import time
     global _tts_cache
     
-    # OPTIMIZATION: Truncate very long text to prevent 2-3s TTS calls
-    # Long text should already be split by the caller, but just in case
+    # Truncate very long text
     if len(text) > 120:
         text = text[:117] + "..."
-        print(f"    ⚠️ TTS text truncated to 120 chars")
     
     # Check cache first
     cache_key = text.lower().strip()
     if cache_key in _tts_cache:
-        print(f"    ⚡ TTS CACHE HIT: '{text[:30]}...' -> 0ms!")
         audio_data = _tts_cache[cache_key]
-        # OPTIMIZATION v3: Even smaller chunks (2KB = ~63ms of audio) for faster streaming
         chunk_size = 2048
         for i in range(0, len(audio_data), chunk_size):
             yield audio_data[i:i + chunk_size]
@@ -248,37 +229,25 @@ def text_to_speech_streaming(text: str):
     
     # Build SSML for natural-sounding speech
     ssml = _build_ssml(text)
-    
-    print(f"    🎤 TTS with SSML: {text[:50]}...")
     start_time = time.time()
     
-    # Get reusable synthesizer
     synthesizer = _get_synthesizer()
-    
-    # Use SSML synthesis for natural voice
     result = synthesizer.speak_ssml_async(ssml).get()
     
     if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
         audio_data = result.audio_data
-        synthesis_time = time.time() - start_time
-        print(f"    ✅ TTS done in {synthesis_time:.2f}s, {len(audio_data)} bytes")
+        synthesis_time = (time.time() - start_time) * 1000
         
-        # Cache this audio for future use (only cache short phrases < 80 chars)
+        # Cache for future use
         if len(text) < 80 and len(_tts_cache) < _tts_cache_max_size:
             _tts_cache[cache_key] = audio_data
-            print(f"    💾 Cached TTS for: '{text[:30]}...'")
         
-        # OPTIMIZATION v3: Smaller chunks (2KB = ~63ms) for faster first audio
-        # This means first audio plays ~63ms after synthesis vs ~125ms before
         chunk_size = 2048
         for i in range(0, len(audio_data), chunk_size):
             yield audio_data[i:i + chunk_size]
     else:
-        print(f"    ❌ TTS failed: {result.reason}")
-        if result.cancellation_details:
-            print(f"    Error: {result.cancellation_details.error_details}")
+        print(f"❌ TTS failed: {result.reason}")
         # Fallback: try without SSML
-        print(f"    🔄 Retrying without SSML...")
         result = synthesizer.speak_text_async(text).get()
         if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
             audio_data = result.audio_data
@@ -287,6 +256,92 @@ def text_to_speech_streaming(text: str):
                 yield audio_data[i:i + chunk_size]
         else:
             raise Exception(f"TTS failed: {result.reason}")
+
+
+# ============================================================================
+# Telephony-specific TTS (8kHz for FreJun/Teler calls)
+# ============================================================================
+
+# Telephony synthesizer cache
+_telephony_synthesizer = None
+_telephony_synthesizer_voice = None
+_telephony_tts_cache = {}
+_telephony_tts_cache_max_size = 50
+
+
+def _get_telephony_synthesizer():
+    """Get or create a reusable telephony synthesizer (8kHz for phone calls)"""
+    global _telephony_synthesizer, _telephony_synthesizer_voice
+    
+    config = get_speech_config()
+    # Use 8kHz 16-bit mono PCM for telephony (required by FreJun/Teler)
+    config.set_speech_synthesis_output_format(
+        speechsdk.SpeechSynthesisOutputFormat.Raw8Khz16BitMonoPcm
+    )
+    
+    if _telephony_synthesizer is None or _telephony_synthesizer_voice != current_synthesis_voice:
+        _telephony_synthesizer = speechsdk.SpeechSynthesizer(
+            speech_config=config,
+            audio_config=None
+        )
+        _telephony_synthesizer_voice = current_synthesis_voice
+    
+    return _telephony_synthesizer
+
+
+def text_to_speech_telephony(text: str):
+    """
+    Synthesize audio for telephony (FreJun/Teler) at 8kHz sample rate.
+    Uses SSML for natural-sounding speech.
+    Yields audio chunks suitable for telephony streaming.
+    """
+    import time
+    global _telephony_tts_cache
+    
+    # Truncate very long text
+    if len(text) > 120:
+        text = text[:117] + "..."
+    
+    # Check cache first
+    cache_key = f"tel_{text.lower().strip()}"
+    if cache_key in _telephony_tts_cache:
+        audio_data = _telephony_tts_cache[cache_key]
+        print(f"   📞 TTS cache hit (telephony)")
+        chunk_size = 8000  # 500ms
+        for i in range(0, len(audio_data), chunk_size):
+            yield audio_data[i:i + chunk_size]
+        return
+    
+    # Build SSML for natural-sounding speech
+    ssml = _build_ssml(text)
+    start_time = time.time()
+    
+    synthesizer = _get_telephony_synthesizer()
+    result = synthesizer.speak_ssml_async(ssml).get()
+    
+    if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+        audio_data = result.audio_data
+        synthesis_time = (time.time() - start_time) * 1000
+        print(f"   📞 TTS (telephony): {len(audio_data)} bytes, {synthesis_time:.0f}ms")
+        
+        # Cache for future use
+        if len(text) < 80 and len(_telephony_tts_cache) < _telephony_tts_cache_max_size:
+            _telephony_tts_cache[cache_key] = audio_data
+        
+        chunk_size = 8000  # 500ms of audio at 8kHz 16-bit (Recommended by FreJun)
+        for i in range(0, len(audio_data), chunk_size):
+            yield audio_data[i:i + chunk_size]
+    else:
+        print(f"❌ Telephony TTS failed: {result.reason}")
+        # Fallback: try without SSML
+        result = synthesizer.speak_text_async(text).get()
+        if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+            audio_data = result.audio_data
+            chunk_size = 8000  # 500ms
+            for i in range(0, len(audio_data), chunk_size):
+                yield audio_data[i:i + chunk_size]
+        else:
+            raise Exception(f"Telephony TTS failed: {result.reason}")
 def text_to_speech_sentence_streaming(llm_stream):
     """
     Stream LLM tokens and synthesize TTS sentence by sentence for low latency.
@@ -300,22 +355,16 @@ def text_to_speech_sentence_streaming(llm_stream):
     for token in llm_stream:
         sentence_buffer += token
         
-        # Check for complete sentences
         match = sentence_end_pattern.search(sentence_buffer)
         if match:
-            # Extract complete sentence
             end_pos = match.end()
             sentence = sentence_buffer[:end_pos].strip()
             sentence_buffer = sentence_buffer[end_pos:]
             
             if sentence:
-                print(f"🔊 TTS sentence: {sentence}")
-                # Stream this sentence's audio immediately
                 for chunk in text_to_speech_streaming(sentence):
                     yield chunk
     
-    # Handle any remaining text
     if sentence_buffer.strip():
-        print(f"🔊 TTS final: {sentence_buffer.strip()}")
         for chunk in text_to_speech_streaming(sentence_buffer.strip()):
             yield chunk

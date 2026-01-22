@@ -106,7 +106,6 @@ def reset_conversation():
     """Reset conversation history (call this at start of each new call)."""
     global _conversation_manager
     _conversation_manager = ConversationManager()
-    print("🔄 Conversation history reset")
 
 
 def add_to_conversation(role: str, content: str):
@@ -116,7 +115,6 @@ def add_to_conversation(role: str, content: str):
         manager.add_user_message(content)
     elif role == "assistant":
         manager.add_assistant_message(content)
-    print(f"   💬 Added to history: {role} ({len(manager)} messages total)")
 
 
 def _warmup_llm_connection():
@@ -225,39 +223,35 @@ def build_prompt_with_context(user_query: str, context: str = "", include_histor
     """
     system_prompt = get_system_prompt()
     
-    # CRITICAL: Add voice agent behavior instructions
-    # This prevents the LLM from speaking meta-instructions and ensures turn-taking
+    # CRITICAL: Voice agent behavior instructions
+    # Follow the system prompt EXACTLY - it defines all behavior, responses, and edge cases
     voice_agent_suffix = """
 
-CRITICAL VOICE AGENT RULES (YOU MUST FOLLOW THESE):
-1. ONLY output the exact words you want to SPEAK. Never output instructions like "Take a pause" or any meta-text.
-2. ASK ONE QUESTION AT A TIME, then STOP and wait for the user's response.
-3. After asking a question (ending with ?), DO NOT continue speaking. Wait for the user.
-4. Keep responses SHORT and conversational for voice.
-5. Never include quotation marks, asterisks, or formatting in your speech.
-6. Do NOT repeat the opening greeting if you've already greeted the user (check conversation history).
+CRITICAL VOICE AGENT RULES:
+1. FOLLOW THE SYSTEM PROMPT EXACTLY - it contains all sections, scripts, and edge cases you must follow.
+2. ONLY output spoken words. Never output meta-instructions like "Take a pause", "Set variable", or stage directions.
+3. ASK ONE QUESTION AT A TIME, then STOP and wait for the user's response.
+4. After asking a question, DO NOT continue. Wait for user input.
+5. Never use quotation marks, asterisks, brackets, or any formatting in your speech.
+6. Check conversation history to know where you are in the script - do NOT repeat greetings.
+7. Handle edge cases EXACTLY as defined in the system prompt (wrong person, busy, etc.).
 """
     
-    # Build system message with context
+    # Build system message
     if context:
         context_truncated = context[:800] if len(context) > 800 else context
-        system_content = f"""{system_prompt}
-{voice_agent_suffix}
-CONTEXT:
-{context_truncated}"""
+        system_content = f"{system_prompt}\n{voice_agent_suffix}\nCONTEXT:\n{context_truncated}"
     else:
         system_content = f"{system_prompt}\n{voice_agent_suffix}"
     
-    # Start with system message
     messages = [{"role": "system", "content": system_content}]
     
-    # Add conversation history if enabled (for multi-turn conversations)
+    # Add conversation history for multi-turn conversations
     if include_history:
         manager = get_conversation_manager()
         history = manager.get_messages()
         if history:
             messages.extend(history)
-            print(f"   📜 Including {len(history)} messages of conversation history")
     
     # Add current user message
     messages.append({"role": "user", "content": user_query})
@@ -325,13 +319,12 @@ def ask_ai_streaming_parallel(text: str):
     import time
     start_time = time.time()
     
-    # Check if we should skip RAG
-    if should_skip_rag(text):
-        print(f"   ⚡ Skipping RAG for simple query: '{text}'")
-        context = ""
-        messages = build_prompt_with_context(text, context)
-    else:
-        # Start RAG in background thread
+    # Skip RAG for conversational prompts (system prompt has all needed info)
+    # RAG is only useful when there's a knowledge base with additional facts
+    context = ""
+    
+    if not should_skip_rag(text):
+        # Try RAG but don't let it delay the response
         rag_result = [None]
         rag_done = threading.Event()
         
@@ -339,36 +332,19 @@ def ask_ai_streaming_parallel(text: str):
             rag_start = time.time()
             try:
                 rag_result[0] = get_context_for_query(text)
-                rag_time = (time.time() - rag_start) * 1000
-                if rag_result[0]:
-                    print(f"   📚 RAG (parallel): {rag_time:.0f}ms ({len(rag_result[0])} chars)")
-                else:
-                    print(f"   📚 RAG (parallel): {rag_time:.0f}ms (no context)")
             except Exception as e:
-                print(f"   ⚠️ RAG error: {e}")
+                # Silently handle RAG errors - not critical for scripted conversations
                 rag_result[0] = ""
             finally:
                 rag_done.set()
         
-        # Start RAG thread
         threading.Thread(target=fetch_rag, daemon=True).start()
-        
-        # DON'T WAIT for RAG - start LLM immediately with base prompt
-        # This is the key optimization: we overlap RAG and LLM network calls
-        
-        # Wait just a tiny bit (50ms) to see if RAG returns fast
-        rag_done.wait(timeout=0.05)
+        rag_done.wait(timeout=0.05)  # Wait max 50ms
         
         if rag_done.is_set() and rag_result[0]:
-            # RAG returned quickly, use it
             context = rag_result[0]
-            print(f"   ✨ RAG returned in <50ms, including context")
-        else:
-            # RAG is slow, start without context
-            context = ""
-            print(f"   🚀 Starting LLM without waiting for RAG")
-        
-        messages = build_prompt_with_context(text, context)
+    
+    messages = build_prompt_with_context(text, context)
     
     # Stream LLM response with optimized parameters
     response = client.chat.completions.create(
@@ -389,30 +365,32 @@ def ask_ai_streaming_parallel(text: str):
 # Keep old function name for backward compatibility
 def ask_ai_streaming(text: str):
     """
-    Stream LLM response with optimizations:
-    1. Check instant response cache first (0ms latency) - ONLY if no custom prompt variables
-    2. Fall back to parallel RAG + LLM
+    Stream LLM response - follows the dynamic system prompt strictly.
     """
-    # Check if custom prompt variables are configured
-    # If so, skip instant responses to use the custom system prompt
-    prompt_variables = agent_config_service.get_prompt_variables()
-    has_custom_variables = bool(prompt_variables and any(v for v in prompt_variables.values() if v))
+    start_time = time.time()
     
-    if not has_custom_variables:
-        # Check for instant response first (greetings, farewells, etc.)
+    # Special handling for agent-first opening message
+    if text == "START_CONVERSATION":
+        opening_query = "Begin the conversation with your opening script. Say only the opening greeting - do not continue beyond asking if you are speaking to the right person."
+        yield from ask_ai_streaming_parallel(opening_query)
+        return
+    
+    # Check if using custom/dynamic prompt
+    prompt_variables = agent_config_service.get_prompt_variables()
+    has_custom_prompt = bool(prompt_variables and any(v for v in prompt_variables.values() if v))
+    
+    if has_custom_prompt:
+        # Dynamic prompt mode: ALWAYS use LLM to follow the prompt strictly
+        # Skip instant responses - agent behavior is defined in the prompt
+        yield from ask_ai_streaming_parallel(text)
+    else:
+        # Default mode: use instant responses for common phrases
         instant = get_instant_response(text)
         if instant:
-            print(f"   ⚡ INSTANT RESPONSE (cached): '{text}' -> 0ms latency!")
-            # Yield the response word by word to simulate streaming
+            print(f"⚡ CACHED: '{text[:30]}...' -> 0ms")
             words = instant.split()
             for i, word in enumerate(words):
-                if i < len(words) - 1:
-                    yield word + " "
-                else:
-                    yield word
+                yield word + (" " if i < len(words) - 1 else "")
             return
-    else:
-        print(f"   📋 Custom prompt variables detected - using LLM with dynamic prompt")
-    
-    # Fall back to parallel RAG + LLM
-    yield from ask_ai_streaming_parallel(text)
+        yield from ask_ai_streaming_parallel(text)
+

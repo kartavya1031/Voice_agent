@@ -23,6 +23,7 @@ from app.services.llm import ask_ai, ask_ai_streaming, reset_conversation, add_t
 from app.services.speech import (
     text_to_speech,
     text_to_speech_streaming,
+    text_to_speech_telephony,
     create_streaming_recognizer,
     update_speech_settings,
     get_current_speech_settings
@@ -37,8 +38,12 @@ from app.services.vector_store import (
 )
 from app.services.agent_config import agent_config_service
 from app.db.service import call_service
+from app.api.frejun import router as frejun_router
 
 app = FastAPI(title="Anvenssa Voice Agent API")
+
+# Include FreJun API router
+app.include_router(frejun_router)
 
 # CORS for React frontend
 app.add_middleware(
@@ -328,29 +333,36 @@ async def create_knowledge_base(
     name: str = Form(...)
 ):
     """Upload a PDF/TXT file and create a new knowledge base"""
+    print(f"📥 KB Upload started: name='{name}', file='{file.filename}'")
     try:
         # Generate unique ID
         kb_id = str(uuid.uuid4())[:8]
-        
+        print(f"   Generated KB ID: {kb_id}")
+       
         # Read file content
         content = await file.read()
         filename = file.filename or "uploaded_file"
-        
+        print(f"   File read: {len(content)} bytes")
+       
         # Save the original file
         file_path = get_kb_file_path(kb_id, filename)
         with open(file_path, 'wb') as f:
             f.write(content)
-        
+        print(f"   File saved to: {file_path}")
+       
         # Extract text based on file type
         text_content = ""
         if filename.lower().endswith('.pdf'):
+            print(f"   Processing PDF...")
             try:
                 import fitz  # PyMuPDF
                 pdf_doc = fitz.open(stream=content, filetype="pdf")
                 for page in pdf_doc:
                     text_content += page.get_text()
                 pdf_doc.close()
+                print(f"   PDF text extracted: {len(text_content)} chars")
             except ImportError:
+                print(f"   PyMuPDF not available, trying pdfplumber...")
                 # Fallback: try with pdfplumber
                 try:
                     import pdfplumber
@@ -358,19 +370,27 @@ async def create_knowledge_base(
                     with pdfplumber.open(io.BytesIO(content)) as pdf:
                         for page in pdf.pages:
                             text_content += page.extract_text() or ""
+                    print(f"   pdfplumber text extracted: {len(text_content)} chars")
                 except ImportError:
+                    print(f"   ❌ No PDF library available!")
                     return {"error": "PDF processing library not installed. Install pymupdf or pdfplumber."}
         elif filename.lower().endswith('.txt') or filename.lower().endswith('.md'):
             text_content = content.decode('utf-8', errors='ignore')
+            print(f"   Text file decoded: {len(text_content)} chars")
         else:
+            print(f"   ❌ Unsupported file type: {filename}")
             return {"error": f"Unsupported file type: {filename}. Supported: .pdf, .txt, .md"}
-        
+       
         if not text_content.strip():
+            print(f"   ❌ No text content extracted from file!")
             return {"error": "Could not extract text from file"}
-        
+       
+        print(f"   Creating vector store collection...")
         # Create knowledge base in vector store
         chunk_count = create_knowledge_base_from_text(kb_id, name, text_content)
-        
+        print(f"   Vector store created with {chunk_count} chunks")
+       
+        print(f"   Saving to agent config...")
         # Save to config
         kb = agent_config_service.add_knowledge_base(
             kb_id=kb_id,
@@ -378,9 +398,9 @@ async def create_knowledge_base(
             filename=filename,
             chunk_count=chunk_count
         )
-        
-        print(f"📚 Created knowledge base: {name} ({kb_id}) with {chunk_count} chunks")
-        
+       
+        print(f"📚 ✅ Created knowledge base: {name} ({kb_id}) with {chunk_count} chunks")
+       
         return {
             "success": True,
             "knowledge_base": {
@@ -391,27 +411,29 @@ async def create_knowledge_base(
                 "chunk_count": kb.chunk_count
             }
         }
-        
+       
     except Exception as e:
         import traceback
+        print(f"   ❌ Exception in create_knowledge_base: {e}")
         traceback.print_exc()
         return {"error": str(e)}
-
-
-@app.post("/api/agent/knowledge-bases/{kb_id}/activate")
-def activate_knowledge_base(kb_id: str):
-    """Set a knowledge base as active"""
-    success = agent_config_service.set_active_knowledge_base(kb_id)
-    
-    if success:
-        # Update vector store to use this KB
-        set_active_knowledge_base(kb_id)
-        print(f"📚 Activated knowledge base: {kb_id}")
-        return {"success": True, "active_id": kb_id}
-    else:
-        return {"error": "Knowledge base not found"}
-
-
+        return {
+            "success": True,
+            "knowledge_base": {
+                "id": kb.id,
+                "name": kb.name,
+                "filename": kb.filename,
+                "created_at": kb.created_at,
+                "chunk_count": kb.chunk_count
+            }
+        }
+       
+    except Exception as e:
+        import traceback
+        print(f"   ❌ Exception in create_knowledge_base: {e}")
+        traceback.print_exc()
+        return {"error": str(e)}
+        
 @app.post("/api/agent/knowledge-bases/deactivate")
 def deactivate_knowledge_base():
     """Deactivate custom knowledge base, use default"""
@@ -645,6 +667,114 @@ async def audio_ws(ws: WebSocket):
     except Exception as e:
         print(f"⚠️ Could not create call record: {e}")
     
+    # ==========================================================================
+    # AGENT-FIRST: Generate opening message from the agent
+    # The agent should always start the conversation as per the system prompt
+    # ==========================================================================
+    async def send_opening_message():
+        """Generate and send the opening message from the agent based on system prompt."""
+        nonlocal transcript
+        
+        opening_start = time.time()
+        is_agent_generating[0] = True
+        is_client_playing[0] = True
+        audio_end_sent[0] = False
+        
+        try:
+            # Use a special prompt to get just the opening line
+            opening_prompt = "START_CONVERSATION"
+            
+            audio_queue = queue.Queue()
+            processing_done = threading.Event()
+            agent_response = []
+            
+            def process_opening():
+                """Generate the opening message using LLM."""
+                try:
+                    sentence_buffer = ""
+                    sentence_end_pattern = re.compile(r'[.!?]\s*')
+                    full_response = ""
+                    tts_start = None
+                    
+                    for token in ask_ai_streaming(opening_prompt):
+                        sentence_buffer += token
+                        full_response += token
+                        
+                        match = sentence_end_pattern.search(sentence_buffer)
+                        if match:
+                            end_pos = match.end()
+                            sentence = sentence_buffer[:end_pos].strip()
+                            sentence_buffer = sentence_buffer[end_pos:]
+                            
+                            if sentence:
+                                sentence = clean_llm_output(sentence)
+                                if sentence:
+                                    if tts_start is None:
+                                        tts_start = time.time()
+                                    for audio_chunk in text_to_speech_streaming(sentence):
+                                        audio_queue.put(audio_chunk)
+                    
+                    # Handle remaining text
+                    remaining = sentence_buffer.strip()
+                    if remaining:
+                        remaining = clean_llm_output(remaining)
+                        if remaining:
+                            for audio_chunk in text_to_speech_streaming(remaining):
+                                audio_queue.put(audio_chunk)
+                    
+                    cleaned_response = clean_llm_output(full_response)
+                    agent_response.append(cleaned_response)
+                    
+                except Exception as e:
+                    print(f"❌ Opening error: {e}")
+                finally:
+                    processing_done.set()
+            
+            # Start processing thread
+            threading.Thread(target=process_opening, daemon=True).start()
+            
+            # Send audio chunks to client
+            chunk_count = 0
+            first_chunk_sent = False
+            while True:
+                try:
+                    audio_chunk = audio_queue.get(timeout=0.1)
+                    await ws.send_json({
+                        "type": "audio_chunk",
+                        "data": base64.b64encode(audio_chunk).decode(),
+                        "first_chunk": not first_chunk_sent
+                    })
+                    first_chunk_sent = True
+                    chunk_count += 1
+                except queue.Empty:
+                    if processing_done.is_set():
+                        break
+                    continue
+                except Exception as e:
+                    print(f"   ❌ WebSocket error in opening: {e}")
+                    break
+            
+            await ws.send_json({"type": "audio_end"})
+            audio_end_sent[0] = True
+            opening_time = (time.time() - opening_start) * 1000
+            print(f"📞 OPENING: {opening_time:.0f}ms total")
+            
+            is_agent_generating[0] = False
+            
+            # Add to transcript and conversation history
+            if agent_response:
+                transcript.append({
+                    "role": "agent",
+                    "text": agent_response[0],
+                    "timestamp": datetime.now().strftime("%H:%M:%S")
+                })
+                add_to_conversation("assistant", agent_response[0])
+                
+        except Exception as e:
+            print(f"❌ Opening error: {e}")
+            is_agent_generating[0] = False
+            is_client_playing[0] = False
+    
     # Silence monitoring task
     async def monitor_call_limits():
         """Monitor for silence timeout and max call duration"""
@@ -686,12 +816,9 @@ async def audio_ws(ws: WebSocket):
         
         print("🧑 STT:", repr(text))
         
-        # Update activity time
         last_activity_time = time.time()
         
-        # Skip empty or whitespace-only text
         if not text or not text.strip():
-            print("⚠️ Empty STT result, skipping...")
             return
         
         # Add user message to transcript
@@ -770,20 +897,19 @@ async def audio_ws(ws: WebSocket):
                     token_count = [0]
                     words_since_flush = [0]
 
-                    print(f"   🤖 LLM Streaming started... (t=0ms)")
+                    print(f"   🤖 LLM streaming...")
                     llm_start = time.time()
                     
                     for token in ask_ai_streaming(text):
                         if my_turn_id != current_turn_id:
-                            print("⛔ Barge-in: Stopping LLM stream")
+                            print("⚡ BARGE-IN: LLM stopped")
                             return
                         
-                        # Track first token time (TTFT - Time To First Token)
                         token_count[0] += 1
                         if first_token_time[0] is None:
                             first_token_time[0] = time.time()
                             ttft = (first_token_time[0] - processing_start_time) * 1000
-                            print(f"   ⚡ LLM TTFT: {ttft:.0f}ms (first token received)")
+                            print(f"   ⚡ TTFT: {ttft:.0f}ms")
 
                         sentence_buffer += token
                         full_llm_response += token
@@ -814,51 +940,42 @@ async def audio_ws(ws: WebSocket):
                             words_since_flush[0] = 0
                             
                             if sentence:
-                                # Clean the sentence to remove meta-instructions
                                 sentence = clean_llm_output(sentence)
-                                if not sentence:  # Skip if cleaning removed everything
+                                if not sentence:
                                     continue
-                                    
-                                tts_start = time.time()
-                                print(f"   🗣️ TTS: '{sentence}'")
+                                
                                 for audio_chunk in text_to_speech_streaming(sentence):
                                     if my_turn_id != current_turn_id:
-                                        print("⛔ Barge-in: Stopping TTS")
+                                        print("⚡ BARGE-IN: TTS stopped")
                                         return
                                     
-                                    # Track first audio chunk time
                                     if first_audio_time[0] is None:
                                         first_audio_time[0] = time.time()
-                                        first_audio_latency = (first_audio_time[0] - processing_start_time) * 1000
-                                        print(f"   🔊 First audio chunk ready: {first_audio_latency:.0f}ms from query")
+                                        latency = (first_audio_time[0] - processing_start_time) * 1000
+                                        print(f"   🔊 First audio: {latency:.0f}ms")
                                     
                                     audio_queue.put(audio_chunk)
 
-                    # Handle remaining text
                     remaining = sentence_buffer.strip()
                     if remaining:
-                        # Clean the remaining text
                         remaining = clean_llm_output(remaining)
-                        if remaining:  # Only process if something remains after cleaning
-                            print(f"   🗣️ TTS final: '{remaining}'")
+                        if remaining:
                             for audio_chunk in text_to_speech_streaming(remaining):
                                 if my_turn_id != current_turn_id:
                                     return
                                 if first_audio_time[0] is None:
                                     first_audio_time[0] = time.time()
-                                    first_audio_latency = (first_audio_time[0] - processing_start_time) * 1000
-                                    print(f"   🔊 First audio chunk ready: {first_audio_latency:.0f}ms from query")
+                                    latency = (first_audio_time[0] - processing_start_time) * 1000
+                                    print(f"   🔊 First audio: {latency:.0f}ms")
                                 audio_queue.put(audio_chunk)
                     
                     llm_end_time[0] = time.time()
                     llm_total = (llm_end_time[0] - llm_start) * 1000
                     total_latency = (llm_end_time[0] - processing_start_time) * 1000
                     
-                    # Store cleaned response for transcript
                     cleaned_response = clean_llm_output(full_llm_response)
                     agent_response.append(cleaned_response)
-                    print(f"   ✅ Full response: {cleaned_response}")
-                    print(f"   📊 TIMING: LLM={llm_total:.0f}ms, Tokens={token_count[0]}, Total={total_latency:.0f}ms")
+                    print(f"   📊 TIMING: LLM={llm_total:.0f}ms | Tokens={token_count[0]} | Total={total_latency:.0f}ms")
 
                 except Exception as e:
                     print(f"   ❌ Pipeline error: {e}")
@@ -870,13 +987,11 @@ async def audio_ws(ws: WebSocket):
             # Start processing thread
             threading.Thread(target=process_pipeline, daemon=True).start()
             
-            # Send audio chunks to client
             chunk_count = 0
             first_chunk_sent = False
             while True:
                 if my_turn_id != current_turn_id:
-                    print("⛔ Barge-in: Stopping transmission")
-                    # Notify client to clear playback
+                    print("⚡ BARGE-IN: Stopping transmission")
                     try:
                         await ws.send_json({"type": "barge_in"})
                     except:
@@ -885,7 +1000,6 @@ async def audio_ws(ws: WebSocket):
 
                 try:
                     audio_chunk = audio_queue.get(timeout=0.1)
-                    # Mark first chunk so client can clear old audio
                     await ws.send_json({
                         "type": "audio_chunk",
                         "data": base64.b64encode(audio_chunk).decode(),
@@ -904,12 +1018,8 @@ async def audio_ws(ws: WebSocket):
             if my_turn_id == current_turn_id:
                 await ws.send_json({"type": "audio_end"})
                 audio_end_sent[0] = True
-                print(f"✅ Sent {chunk_count} audio chunks")
                 
-                # Mark that server finished generating - client still playing
-                # is_client_playing remains True until playback_complete received
                 is_agent_generating[0] = False
-                print(f"   📤 All audio sent, waiting for client playback to finish...")
                 
                 # Add agent response to transcript
                 if agent_response:
@@ -924,9 +1034,7 @@ async def audio_ws(ws: WebSocket):
                     
                     # Check if LLM response indicates end of conversation
                     if detect_end_intent_simple(agent_response[0]):
-                        print("👋 Agent response indicates end of call")
                         end_reason[0] = "conversation_complete"
-                        call_ended.set()
             else:
                 # Barge-in happened - reset all flags
                 is_agent_generating[0] = False
@@ -953,29 +1061,28 @@ async def audio_ws(ws: WebSocket):
         """Called when STT detects partial speech - immediately interrupt TTS"""
         global current_turn_id
         
-        # Trigger barge-in if agent is generating OR client is still playing audio
         if is_agent_generating[0] or is_client_playing[0]:
             with current_turn_lock:
                 current_turn_id += 1
             
-            # Reset client playing state - we're interrupting
             is_client_playing[0] = False
+            print("⚡ BARGE-IN detected")
             
-            print("⚡ BARGE-IN: User started speaking, interrupting agent")
-            
-            # Send barge-in signal to client to stop playback immediately
             try:
                 asyncio.run_coroutine_threadsafe(
                     ws.send_json({"type": "barge_in"}),
                     loop
                 )
-            except Exception as e:
-                print(f"   ⚠️ Could not send barge_in signal: {e}")
+            except Exception:
+                pass
 
     recognizer, audio_stream = create_streaming_recognizer(on_text_callback, on_barge_in_callback)
     
     # Start call limit monitor
     monitor_task = asyncio.create_task(monitor_call_limits())
+    
+    # AGENT-FIRST: Send opening message from agent before listening for user input
+    await send_opening_message()
 
     try:
         while not call_ended.is_set():
@@ -991,9 +1098,13 @@ async def audio_ws(ws: WebSocket):
                     # Client finished playing all audio
                     is_client_playing[0] = False
                     
+                    # Check if call should end after this playback (agent said goodbye)
+                    if end_reason[0] == "conversation_complete":
+                        print(f"   🔈 Playback complete - ending call now")
+                        call_ended.set()
                     # Only start silence timer if server also finished sending audio
                     # (Don't start timer if new audio is being generated)
-                    if audio_end_sent[0] and not is_agent_generating[0]:
+                    elif audio_end_sent[0] and not is_agent_generating[0]:
                         last_playback_complete_time[0] = time.time()
                         print(f"   🔈 Client playback complete - silence timer started ({settings.max_silence_duration}s)")
                     
@@ -1038,3 +1149,319 @@ async def audio_ws(ws: WebSocket):
                 pass
         
         print(f"📞 Call ended. Duration: {call_duration:.1f}s, Reason: {end_reason[0]}")
+
+
+# ============================================================================
+# FreJun (Teler) WebSocket Handler for Phone Calls
+# ============================================================================
+
+@app.websocket("/ws/frejun-audio")
+async def frejun_audio_ws(ws: WebSocket):
+    """
+    WebSocket handler for FreJun media streaming.
+    
+    FreJun sends:
+    - {"type": "start", ...} - Stream metadata
+    - {"type": "audio", "data": {"audio_b64": "..."}} - Audio chunks
+    
+    We send back:
+    - {"type": "audio", "audio_b64": "...", "chunk_id": N} - Response audio
+    - {"type": "clear"} - Clear audio buffer (for barge-in)
+    """
+    global current_turn_id
+    
+    # Log connection details for debugging
+    print(f"🔗 FreJun WebSocket connection attempt from: {ws.client}")
+    print(f"   Headers: {dict(ws.headers)}")
+    
+    
+    try:
+        # Accept the WebSocket connection
+        await ws.accept()
+        print("🔗 FreJun WebSocket connected successfully")
+    except Exception as e:
+        print(f"❌ WebSocket connection failed: {e}")
+        return
+    
+    loop = asyncio.get_running_loop()
+    
+    # Call state
+    call_start_time = time.time()
+    stream_id = None
+    sample_rate = 8000  # Default, may be updated from 'start' message
+    transcript = []
+    call_ended = threading.Event()
+    end_reason = [None]
+    is_agent_generating = [False]
+    audio_chunk_id = [0]
+    
+    # Create call record in database
+    call_id = None
+    try:
+        call_record = call_service.create_call(call_provider="frejun")
+        call_id = call_record.id
+        print(f"📞 FreJun call started with ID: {call_id}")
+        reset_conversation()
+    except Exception as e:
+        print(f"⚠️ Could not create call record: {e}")
+    
+    async def send_audio_to_frejun(audio_data: bytes):
+        """Send audio chunk to FreJun for playback"""
+        nonlocal audio_chunk_id
+        audio_chunk_id[0] += 1
+        
+        # FreJun expects base64 encoded audio
+        audio_b64 = base64.b64encode(audio_data).decode()
+        
+        await ws.send_json({
+            "type": "audio",
+            "audio_b64": audio_b64,
+            "chunk_id": audio_chunk_id[0]
+        })
+    
+    async def send_clear_to_frejun():
+        """Clear FreJun's audio buffer (for barge-in)"""
+        await ws.send_json({"type": "clear"})
+    
+    async def on_text(text: str, my_turn_id: int):
+        """Handle recognized speech from user"""
+        global current_turn_id
+        
+        print("🧑 STT:", repr(text))
+        
+        if not text or not text.strip():
+            return
+        
+        transcript.append({
+            "role": "user",
+            "text": text,
+            "timestamp": datetime.now().strftime("%H:%M:%S")
+        })
+        add_to_conversation("user", text)
+        
+        # Check for end intent
+        if detect_end_intent_simple(text):
+            goodbye_msg = "Thank you for calling. Goodbye!"
+            transcript.append({
+                "role": "agent",
+                "text": goodbye_msg,
+                "timestamp": datetime.now().strftime("%H:%M:%S")
+            })
+            
+            for audio_chunk in text_to_speech_telephony(goodbye_msg):
+                await send_audio_to_frejun(audio_chunk)
+            
+            end_reason[0] = "user_intent"
+            call_ended.set()
+            return
+        
+        try:
+            is_agent_generating[0] = True
+            
+            audio_queue = queue.Queue()
+            processing_done = threading.Event()
+            agent_response = []
+            
+            processing_start_time = time.time()
+            
+            def process_pipeline():
+                try:
+                    sentence_buffer = ""
+                    sentence_end_pattern = re.compile(r'[.!?]\s*')
+                    full_llm_response = ""
+                    
+                    print(f"   🤖 LLM streaming...")
+                    
+                    for token in ask_ai_streaming(text):
+                        if my_turn_id != current_turn_id:
+                            print("⚡ BARGE-IN: LLM stopped")
+                            return
+                        
+                        sentence_buffer += token
+                        full_llm_response += token
+                        
+                        match = sentence_end_pattern.search(sentence_buffer)
+                        if match:
+                            end_pos = match.end()
+                            sentence = sentence_buffer[:end_pos].strip()
+                            sentence_buffer = sentence_buffer[end_pos:]
+                            
+                            if sentence:
+                                sentence = clean_llm_output(sentence)
+                                if sentence:
+                                    for audio_chunk in text_to_speech_telephony(sentence):
+                                        if my_turn_id != current_turn_id:
+                                            return
+                                        audio_queue.put(audio_chunk)
+                    
+                    remaining = sentence_buffer.strip()
+                    if remaining:
+                        remaining = clean_llm_output(remaining)
+                        if remaining:
+                            for audio_chunk in text_to_speech_telephony(remaining):
+                                if my_turn_id != current_turn_id:
+                                    return
+                                audio_queue.put(audio_chunk)
+                    
+                    cleaned_response = clean_llm_output(full_llm_response)
+                    agent_response.append(cleaned_response)
+                    
+                    total_time = (time.time() - processing_start_time) * 1000
+                    print(f"   📊 TIMING: Total={total_time:.0f}ms")
+                    
+                except Exception as e:
+                    print(f"   ❌ Pipeline error: {e}")
+                finally:
+                    processing_done.set()
+            
+            threading.Thread(target=process_pipeline, daemon=True).start()
+            
+            # Send audio to FreJun as it becomes available
+            while True:
+                if my_turn_id != current_turn_id:
+                    print("⚡ BARGE-IN: Stopping transmission")
+                    await send_clear_to_frejun()
+                    break
+                
+                try:
+                    audio_chunk = audio_queue.get(timeout=0.1)
+                    await send_audio_to_frejun(audio_chunk)
+                except queue.Empty:
+                    if processing_done.is_set():
+                        break
+                    continue
+            
+            is_agent_generating[0] = False
+            
+            if agent_response:
+                transcript.append({
+                    "role": "agent",
+                    "text": agent_response[0],
+                    "timestamp": datetime.now().strftime("%H:%M:%S")
+                })
+                add_to_conversation("assistant", agent_response[0])
+                
+                if detect_end_intent_simple(agent_response[0]):
+                    end_reason[0] = "conversation_complete"
+                    call_ended.set()
+                    
+        except Exception as e:
+            print(f"❌ Error in FreJun on_text: {e}")
+            is_agent_generating[0] = False
+    
+    def on_text_callback(text: str):
+        global current_turn_id
+        
+        with current_turn_lock:
+            current_turn_id += 1
+            my_turn_id = current_turn_id
+        
+        asyncio.run_coroutine_threadsafe(on_text(text, my_turn_id), loop)
+    
+    def on_barge_in_callback():
+        global current_turn_id
+        
+        if is_agent_generating[0]:
+            with current_turn_lock:
+                current_turn_id += 1
+            
+            print("⚡ BARGE-IN detected")
+            
+            try:
+                asyncio.run_coroutine_threadsafe(
+                    send_clear_to_frejun(),
+                    loop
+                )
+            except Exception:
+                pass
+    
+    # Create STT recognizer - will be initialized after we know sample rate
+    recognizer = None
+    audio_stream = None
+    opening_sent = [False]
+    
+    try:
+        # Wait for messages from FreJun
+        while not call_ended.is_set():
+            try:
+                msg = await asyncio.wait_for(ws.receive_json(), timeout=30.0)
+                msg_type = msg.get("type", "")
+                
+                if msg_type == "start":
+                    # Stream started - initialize STT with correct sample rate
+                    data = msg.get("data", {})
+                    sample_rate = data.get("sample_rate", 8000)
+                    stream_id = msg.get("stream_id")
+                    print(f"📡 FreJun stream started: {stream_id}, sample_rate={sample_rate}")
+                    
+                    # Create recognizer for this call
+                    recognizer, audio_stream = create_streaming_recognizer(
+                        on_text_callback, 
+                        on_barge_in_callback,
+                        sample_rate=sample_rate
+                    )
+                    
+                    # NOW send opening message after stream is established
+                    if not opening_sent[0]:
+                        opening_sent[0] = True
+                        print("🎤 Sending FreJun opening message...")
+                        opening_start = time.time()
+                        
+                        opening_prompt = "START_CONVERSATION"
+                        opening_text = "".join([t for t in ask_ai_streaming(opening_prompt)])
+                        cleaned_opening = clean_llm_output(opening_text)
+                        
+                        if cleaned_opening:
+                            for sentence_audio in text_to_speech_telephony(cleaned_opening):
+                                await send_audio_to_frejun(sentence_audio)
+                        
+                        opening_time = (time.time() - opening_start) * 1000
+                        print(f"📞 Opening sent: {opening_time:.0f}ms")
+                    
+                elif msg_type == "audio":
+                    # Audio chunk from FreJun (caller's voice)
+                    data = msg.get("data", {})
+                    audio_b64 = data.get("audio_b64", "")
+                    
+                    if audio_b64 and audio_stream:
+                        audio_bytes = base64.b64decode(audio_b64)
+                        audio_stream.write(audio_bytes)
+                        
+            except asyncio.TimeoutError:
+                # No message for 30 seconds - end call
+                print("⏰ FreJun call timeout - no activity")
+                end_reason[0] = "timeout"
+                break
+            except Exception as e:
+                print(f"❌ FreJun WebSocket error: {e}")
+                break
+                
+    except Exception as e:
+        print(f"❌ FreJun connection error: {e}")
+        end_reason[0] = "connection_error"
+        
+    finally:
+        # Cleanup
+        if recognizer:
+            try:
+                recognizer.stop_continuous_recognition()
+            except:
+                pass
+        if audio_stream:
+            try:
+                audio_stream.close()
+            except:
+                pass
+        
+        call_duration = time.time() - call_start_time
+        
+        if transcript:
+            save_transcript(transcript, call_duration, call_id=call_id, end_reason=end_reason[0])
+        elif call_id:
+            try:
+                call_service.end_call(call_id, end_reason=end_reason[0] or "no_transcript", duration_seconds=int(call_duration))
+            except:
+                pass
+        
+        print(f"📞 FreJun call ended. Duration: {call_duration:.1f}s, Reason: {end_reason[0]}")
+

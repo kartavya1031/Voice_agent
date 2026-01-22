@@ -45,6 +45,13 @@ function App() {
     const [promptVariables, setPromptVariables] = useState({})
     const [detectedVariables, setDetectedVariables] = useState([])
     const [savingVariables, setSavingVariables] = useState(false)
+
+    // FreJun Phone Call State
+    const [phoneNumber, setPhoneNumber] = useState('')
+    const [phoneCallStatus, setPhoneCallStatus] = useState('idle') // idle, calling, active, ended
+    const [phoneCallId, setPhoneCallId] = useState(null)
+    const [frejunConfig, setFrejunConfig] = useState({ configured: false, from_number: null })
+
     const fileInputRef = useRef(null)
     // Refs
     const wsRef = useRef(null)
@@ -347,6 +354,7 @@ function App() {
         fetchTranscripts()
         fetchAgentConfig()
         fetchVoices()
+        fetchFrejunConfig()
     }, [])
 
     // Fetch agent configuration
@@ -373,6 +381,57 @@ function App() {
         } catch (err) {
             console.error('Error fetching voices:', err)
         }
+    }
+
+    // Fetch FreJun configuration
+    const fetchFrejunConfig = async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/frejun/config`)
+            const data = await res.json()
+            setFrejunConfig(data)
+        } catch (err) {
+            console.error('Error fetching FreJun config:', err)
+        }
+    }
+
+    // Initiate phone call via FreJun
+    const initiatePhoneCall = async () => {
+        if (!phoneNumber.trim()) {
+            addLog('Please enter a phone number')
+            return
+        }
+
+        setPhoneCallStatus('calling')
+        addLog(`📞 Initiating call to ${phoneNumber}...`)
+
+        try {
+            const res = await fetch(`${API_URL}/api/frejun/initiate-call`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ to_number: phoneNumber, record: true })
+            })
+            const data = await res.json()
+
+            if (data.success) {
+                setPhoneCallId(data.call_id)
+                setPhoneCallStatus('active')
+                addLog(`✅ ${data.message}`)
+                addLog(`📞 Call ID: ${data.call_id}`)
+            } else {
+                setPhoneCallStatus('idle')
+                addLog(`❌ Call failed: ${data.message}`)
+            }
+        } catch (err) {
+            setPhoneCallStatus('idle')
+            addLog(`❌ Error: ${err.message}`)
+        }
+    }
+
+    // Reset phone call state
+    const resetPhoneCall = () => {
+        setPhoneCallStatus('idle')
+        setPhoneCallId(null)
+        setPhoneNumber('')
     }
 
     // Update speech settings
@@ -974,6 +1033,68 @@ function App() {
                                                 Click to start a voice conversation with the AI agent
                                             </div>
                                         )}
+                                    </div>
+
+                                    {/* Phone Call Card - FreJun */}
+                                    <div className="card phone-call-card">
+                                        <div className="card-header">
+                                            <div className="card-icon phone">📱</div>
+                                            <div>
+                                                <div className="card-title">Phone Call</div>
+                                                <div className="card-description">
+                                                    {frejunConfig.configured
+                                                        ? `Call from ${frejunConfig.from_number}`
+                                                        : 'Configure FreJun API key to enable'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="card-content">
+                                            <div className="setting-row">
+                                                <label>Phone Number</label>
+                                                <input
+                                                    type="tel"
+                                                    value={phoneNumber}
+                                                    onChange={(e) => setPhoneNumber(e.target.value)}
+                                                    placeholder="Enter phone number (e.g., 9876543210)"
+                                                    disabled={phoneCallStatus === 'calling' || phoneCallStatus === 'active'}
+                                                    className="phone-input"
+                                                />
+                                            </div>
+                                            <div className="phone-actions">
+                                                {phoneCallStatus === 'idle' && (
+                                                    <button
+                                                        className="call-btn phone-call"
+                                                        onClick={initiatePhoneCall}
+                                                        disabled={!frejunConfig.configured || !phoneNumber.trim()}
+                                                    >
+                                                        <span className="btn-icon">📞</span>
+                                                        <span className="btn-text">Call Now</span>
+                                                    </button>
+                                                )}
+                                                {phoneCallStatus === 'calling' && (
+                                                    <button className="call-btn calling" disabled>
+                                                        <span className="btn-icon">📞</span>
+                                                        <span className="btn-text">Calling...</span>
+                                                    </button>
+                                                )}
+                                                {phoneCallStatus === 'active' && (
+                                                    <>
+                                                        <div className="call-active-info">
+                                                            <span className="pulse-dot"></span>
+                                                            Call in progress (ID: {phoneCallId})
+                                                        </div>
+                                                        <button className="call-btn secondary" onClick={resetPhoneCall}>
+                                                            New Call
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+                                            {!frejunConfig.configured && (
+                                                <div className="phone-hint">
+                                                    💡 Add FREJUN_API_KEY and FREJUN_FROM_NUMBER to your .env file
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                     {/* Settings Card */}
                                     <div className="card">
