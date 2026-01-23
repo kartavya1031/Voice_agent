@@ -137,15 +137,26 @@ async def initiate_call(request: InitiateCallRequest, req: Request):
             )
             
             if response.status_code == 202:
-                # Store call info
+                # Parse response to get FreJun's call_id
+                response_data = response.json() if response.text else {}
+                frejun_call_id = response_data.get("call_id", call_id)
+                
+                # Store call info in memory (for linking with WebSocket later)
                 active_calls[call_id] = {
                     "to_number": to_number,
                     "from_number": FREJUN_FROM_NUMBER,
                     "status": "initiated",
-                    "started_at": datetime.now().isoformat()
+                    "started_at": datetime.now().isoformat(),
+                    "frejun_call_id": frejun_call_id
                 }
                 
-                print(f"✅ FreJun call initiated: {call_id}")
+                # Also store by FreJun's call_id for webhook lookups
+                if frejun_call_id and frejun_call_id != call_id:
+                    active_calls[frejun_call_id] = active_calls[call_id]
+                
+                print(f"✅ FreJun call initiated: {call_id} (FreJun ID: {frejun_call_id})")
+                print(f"   To: {to_number}, From: {FREJUN_FROM_NUMBER}")
+                
                 return InitiateCallResponse(
                     success=True,
                     call_id=call_id,
@@ -203,12 +214,15 @@ async def get_call_flow(call_id: str, req: Request):
     if call_id in active_calls:
         active_calls[call_id]["status"] = "connected"
     
-    # Return stream flow configuration
+    # Return stream flow configuration with barge-in enabled
     return {
         "action": "stream",
         "ws_url": ws_url,
         "chunk_size": 500,  # 500ms chunks
-        "sample_rate": "8k"  # 8kHz for telephony (matches our TTS output)
+        "sample_rate": "8k",  # 8kHz for telephony (matches our TTS output)
+        "bargeIn": True,  # Enable barge-in support
+        "barge_in": True,  # Alternative key for barge-in
+        "interruptible": True  # Allow user to interrupt agent
     }
 
 
@@ -236,7 +250,10 @@ async def get_incoming_call_flow(req: Request):
         "action": "stream",
         "ws_url": ws_url,
         "chunk_size": 500,
-        "sample_rate": "8k"  # 8kHz for telephony
+        "sample_rate": "8k",  # 8kHz for telephony
+        "bargeIn": True,  # Enable barge-in support
+        "barge_in": True,  # Alternative key for barge-in
+        "interruptible": True  # Allow user to interrupt agent
     }
 
 
@@ -250,7 +267,13 @@ async def frejun_webhook(request: Request):
     - call.answered: Call was answered
     - call.completed: Call ended normally
     - call.failed: Call failed
+    - stream.initiated: Stream started
+    - stream.completed: Stream ended
+    - recording.completed: Recording available
+    - recording.failed: Recording failed
     """
+    from app.db.service import call_service
+    
     try:
         body = await request.json()
         event = body.get("event", "unknown")
@@ -260,14 +283,61 @@ async def frejun_webhook(request: Request):
         print(f"📨 FreJun webhook: {event}")
         print(f"   Data: {data}")
         
-        # Update call status
+        # Update in-memory active calls
         if call_id and call_id in active_calls:
-            active_calls[call_id]["status"] = event.replace("call.", "")
+            active_calls[call_id]["status"] = event.replace("call.", "").replace("stream.", "").replace("recording.", "")
             
             if event == "call.completed":
                 active_calls[call_id]["duration"] = data.get("duration", 0)
             elif event == "call.failed":
                 active_calls[call_id]["failure"] = data.get("failure", {})
+        
+        # Update database
+        if call_id:
+            try:
+                # Extract phone numbers from webhook data
+                from_number = data.get("from") or data.get("from_number")
+                to_number = data.get("to") or data.get("to_number")
+                
+                # Handle call events
+                if event.startswith("call."):
+                    status = event.replace("call.", "")
+                    call_service.update_call_status(call_id, status)
+                    
+                    # Update phone numbers if available (especially on call.initiated)
+                    if from_number or to_number:
+                        call_service.update_call_phone_numbers(
+                            call_id, 
+                            from_number=from_number, 
+                            to_number=to_number,
+                            provider_call_id=call_id
+                        )
+                    
+                    if event == "call.completed":
+                        duration = data.get("duration", 0)
+                        call_service.end_call(call_id, "completed", duration)
+                
+                # Handle stream events
+                elif event.startswith("stream."):
+                    stream_id = data.get("stream_id")
+                    if event == "stream.initiated" and stream_id:
+                        call_service.update_call_stream(call_id, stream_id)
+                        call_service.update_call_status(call_id, "streaming")
+                    elif event == "stream.completed":
+                        call_service.update_call_status(call_id, "stream_completed")
+                
+                # Handle recording events
+                elif event.startswith("recording."):
+                    recording_url = data.get("recording_url")
+                    recording_id = data.get("recording_id")
+                    if event == "recording.completed" and recording_url:
+                        call_service.update_call_recording(call_id, recording_url, recording_id)
+                        print(f"   💾 Recording URL saved: {recording_url[:50]}...")
+                    elif event == "recording.failed":
+                        call_service.update_call_status(call_id, "recording_failed")
+                
+            except Exception as db_error:
+                print(f"   ⚠️ Database update error: {db_error}")
         
         return {"status": "ok"}
         

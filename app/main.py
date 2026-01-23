@@ -39,11 +39,14 @@ from app.services.vector_store import (
 from app.services.agent_config import agent_config_service
 from app.db.service import call_service
 from app.api.frejun import router as frejun_router
+from app.api.webhooks import router as webhooks_router
 
 app = FastAPI(title="Anvenssa Voice Agent API")
 
 # Include FreJun API router
 app.include_router(frejun_router)
+# Include Webhooks router for stream/recording events
+app.include_router(webhooks_router)
 
 # CORS for React frontend
 app.add_middleware(
@@ -154,16 +157,31 @@ def list_calls():
                 {
                     "id": c.id,
                     "provider": c.call_provider,
+                    "from_number": c.from_number,
+                    "to_number": c.to_number,
                     "start_time": c.start_time.isoformat() if c.start_time else None,
                     "end_time": c.end_time.isoformat() if c.end_time else None,
                     "duration": c.duration_seconds,
-                    "end_reason": c.end_reason
+                    "status": getattr(c, 'status', None) or c.end_reason or "unknown",
+                    "end_reason": c.end_reason,
+                    "recording_url": getattr(c, 'recording_url', None),
+                    "recording_id": getattr(c, 'recording_id', None)
                 }
                 for c in calls
             ]
         }
     except Exception as e:
         return {"error": str(e), "calls": []}
+
+
+@app.get("/api/calls/history")
+def get_call_history():
+    """Get call history with full details including recordings and transcripts"""
+    try:
+        calls = call_service.get_calls_with_details(limit=50)
+        return {"calls": calls, "total": len(calls)}
+    except Exception as e:
+        return {"error": str(e), "calls": [], "total": 0}
 
 
 @app.get("/api/calls/{call_id}")
@@ -180,13 +198,59 @@ def get_call(call_id: str):
         return {
             "id": call.id,
             "provider": call.call_provider,
+            "from_number": call.from_number,
+            "to_number": call.to_number,
             "start_time": call.start_time.isoformat() if call.start_time else None,
             "end_time": call.end_time.isoformat() if call.end_time else None,
             "duration": call.duration_seconds,
+            "status": getattr(call, 'status', None) or call.end_reason or "unknown",
             "end_reason": call.end_reason,
+            "recording_url": getattr(call, 'recording_url', None),
+            "recording_id": getattr(call, 'recording_id', None),
             "transcript": transcript_content
         }
     except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/api/calls/{call_id}/recording")
+async def get_call_recording(call_id: str):
+    """
+    Proxy endpoint to serve call recordings.
+    This avoids CORS issues when playing recordings from FreJun.
+    """
+    from fastapi.responses import StreamingResponse
+    import httpx
+    
+    try:
+        call = call_service.get_call(call_id)
+        if not call:
+            return {"error": "Call not found"}
+        
+        recording_url = getattr(call, 'recording_url', None)
+        if not recording_url:
+            return {"error": "No recording available for this call"}
+        
+        # Fetch the recording from FreJun
+        async with httpx.AsyncClient() as client:
+            response = await client.get(recording_url, follow_redirects=True)
+            
+            if response.status_code != 200:
+                return {"error": f"Failed to fetch recording: {response.status_code}"}
+            
+            # Return the audio file as a streaming response
+            content_type = response.headers.get("content-type", "audio/wav")
+            
+            return StreamingResponse(
+                iter([response.content]),
+                media_type=content_type,
+                headers={
+                    "Content-Disposition": f'inline; filename="recording_{call_id}.wav"',
+                    "Accept-Ranges": "bytes"
+                }
+            )
+    except Exception as e:
+        print(f"❌ Error fetching recording: {e}")
         return {"error": str(e)}
 
 
@@ -1194,6 +1258,11 @@ async def frejun_audio_ws(ws: WebSocket):
     end_reason = [None]
     is_agent_generating = [False]
     audio_chunk_id = [0]
+    last_audio_sent_time = [0]  # Track when we last sent audio (for barge-in timing)
+    phone_numbers = {"from": None, "to": None}  # Will be set from stream start message
+    
+    # Import active_calls from frejun API
+    from app.api.frejun import active_calls
     
     # Create call record in database
     call_id = None
@@ -1207,8 +1276,9 @@ async def frejun_audio_ws(ws: WebSocket):
     
     async def send_audio_to_frejun(audio_data: bytes):
         """Send audio chunk to FreJun for playback"""
-        nonlocal audio_chunk_id
+        nonlocal audio_chunk_id, last_audio_sent_time
         audio_chunk_id[0] += 1
+        last_audio_sent_time[0] = time.time()  # Track when we sent audio
         
         # FreJun expects base64 encoded audio
         audio_b64 = base64.b64encode(audio_data).decode()
@@ -1220,7 +1290,23 @@ async def frejun_audio_ws(ws: WebSocket):
         })
     
     async def send_clear_to_frejun():
-        """Clear FreJun's audio buffer (for barge-in)"""
+        """Clear FreJun's audio buffer (for barge-in)
+        
+        According to FreJun docs:
+        - {"type": "clear"} - Wipes out entire buffer of queued chunks
+        - {"type": "interrupt", "chunk_id": N} - Interrupts a specific chunk
+        """
+        print(f"   🛑 Sending CLEAR command to FreJun (last chunk: {audio_chunk_id[0]})")
+        
+        # First, send interrupt for recent chunks (in case they're playing)
+        current_chunk = audio_chunk_id[0]
+        for i in range(max(1, current_chunk - 5), current_chunk + 1):
+            try:
+                await ws.send_json({"type": "interrupt", "chunk_id": i})
+            except:
+                pass
+        
+        # Then send clear to wipe any queued chunks
         await ws.send_json({"type": "clear"})
     
     async def on_text(text: str, my_turn_id: int):
@@ -1359,21 +1445,42 @@ async def frejun_audio_ws(ws: WebSocket):
         asyncio.run_coroutine_threadsafe(on_text(text, my_turn_id), loop)
     
     def on_barge_in_callback():
+        """
+        Called when the user starts speaking during agent response.
+        Immediately stops LLM generation and clears FreJun audio buffer.
+        
+        IMPORTANT: We always send a clear command because:
+        - The server might have finished sending audio, but it's still playing on the phone
+        - There's network/buffer delay between sending and hearing
+        - FreJun may have buffered audio that needs to be cleared
+        """
         global current_turn_id
         
-        if is_agent_generating[0]:
+        # Calculate time since last audio was sent (if tracked)
+        time_since_last_audio = time.time() - last_audio_sent_time[0] if last_audio_sent_time[0] else float('inf')
+        
+        # Barge-in is relevant if:
+        # 1. We're currently generating, OR
+        # 2. Audio was sent recently (within last 5 seconds - buffer/playback time)
+        should_barge_in = is_agent_generating[0] or time_since_last_audio < 5.0
+        
+        if should_barge_in:
             with current_turn_lock:
                 current_turn_id += 1
+                new_turn = current_turn_id
             
-            print("⚡ BARGE-IN detected")
+            print(f"⚡ BARGE-IN detected! Stopping agent (turn {new_turn})")
+            print(f"   is_generating={is_agent_generating[0]}, time_since_audio={time_since_last_audio:.1f}s")
+            is_agent_generating[0] = False  # Mark as not generating immediately
             
+            # Send clear command to FreJun to stop audio playback
             try:
                 asyncio.run_coroutine_threadsafe(
                     send_clear_to_frejun(),
                     loop
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"   ⚠️ Error sending clear: {e}")
     
     # Create STT recognizer - will be initialized after we know sample rate
     recognizer = None
@@ -1392,7 +1499,34 @@ async def frejun_audio_ws(ws: WebSocket):
                     data = msg.get("data", {})
                     sample_rate = data.get("sample_rate", 8000)
                     stream_id = msg.get("stream_id")
+                    frejun_call_id = data.get("call_id") or msg.get("call_id")
                     print(f"📡 FreJun stream started: {stream_id}, sample_rate={sample_rate}")
+                    print(f"   FreJun Call ID: {frejun_call_id}")
+                    
+                    # Try to get phone numbers from the stream data or active_calls
+                    from_num = data.get("from") or data.get("from_number")
+                    to_num = data.get("to") or data.get("to_number")
+                    
+                    # If not in stream data, check active_calls using any identifier we have
+                    if not (from_num and to_num):
+                        for cid, cinfo in active_calls.items():
+                            if cinfo.get("frejun_call_id") == frejun_call_id or cid == frejun_call_id:
+                                from_num = from_num or cinfo.get("from_number")
+                                to_num = to_num or cinfo.get("to_number")
+                                print(f"   Found phone numbers from active_calls: {from_num} -> {to_num}")
+                                break
+                    
+                    # Update database with phone numbers
+                    if call_id and (from_num or to_num):
+                        try:
+                            call_service.update_call_phone_numbers(
+                                call_id,
+                                from_number=from_num,
+                                to_number=to_num,
+                                provider_call_id=frejun_call_id
+                            )
+                        except Exception as e:
+                            print(f"   ⚠️ Could not update phone numbers: {e}")
                     
                     # Create recognizer for this call
                     recognizer, audio_stream = create_streaming_recognizer(

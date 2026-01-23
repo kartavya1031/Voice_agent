@@ -324,7 +324,7 @@ def ask_ai_streaming_parallel(text: str):
     context = ""
     
     if not should_skip_rag(text):
-        # Try RAG but don't let it delay the response
+        # Try RAG but don't let it delay the response too much
         rag_result = [None]
         rag_done = threading.Event()
         
@@ -332,17 +332,23 @@ def ask_ai_streaming_parallel(text: str):
             rag_start = time.time()
             try:
                 rag_result[0] = get_context_for_query(text)
+                rag_time = (time.time() - rag_start) * 1000
+                if rag_result[0]:
+                    print(f"   📚 RAG found context ({rag_time:.0f}ms): {rag_result[0][:100]}...")
             except Exception as e:
-                # Silently handle RAG errors - not critical for scripted conversations
+                print(f"   ⚠️ RAG error: {e}")
                 rag_result[0] = ""
             finally:
                 rag_done.set()
         
         threading.Thread(target=fetch_rag, daemon=True).start()
-        rag_done.wait(timeout=0.05)  # Wait max 50ms
+        rag_done.wait(timeout=0.5)  # Wait max 500ms for RAG (was 50ms - too short!)
         
         if rag_done.is_set() and rag_result[0]:
             context = rag_result[0]
+            print(f"   ✅ Using RAG context: {len(context)} chars")
+        elif not rag_done.is_set():
+            print(f"   ⏰ RAG timeout - proceeding without context")
     
     messages = build_prompt_with_context(text, context)
     

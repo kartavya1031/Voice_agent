@@ -87,6 +87,7 @@ def create_streaming_recognizer(on_text_callback, on_barge_in_callback=None, sam
     Calls on_text_callback(text) when speech is recognized.
     Calls on_barge_in_callback() when partial speech is detected (for barge-in).
     """
+    import time
     config = get_speech_config()
     
     # Define audio format: sample_rate (default 16kHz), 16-bit, mono PCM
@@ -103,15 +104,31 @@ def create_streaming_recognizer(on_text_callback, on_barge_in_callback=None, sam
         audio_config=audio_config
     )
     
+    # Barge-in state tracking
+    last_barge_in_time = [0]
+    barge_in_debounce_ms = 300  # Minimum time between barge-in signals
+    min_barge_in_words = 1  # Minimum words to trigger barge-in
+    
     def recognized(evt):
         if evt.result.reason == speechsdk.ResultReason.RecognizedSpeech:
             on_text_callback(evt.result.text)
     
     def recognizing(evt):
+        """
+        Called when partial speech is detected.
+        Trigger barge-in when user starts speaking (with debouncing).
+        """
         text = evt.result.text
-        # Trigger barge-in when user starts speaking
-        if on_barge_in_callback and text and len(text.strip()) > 0:
-            on_barge_in_callback()
+        if on_barge_in_callback and text:
+            # Count actual words (not just any character)
+            words = text.strip().split()
+            if len(words) >= min_barge_in_words:
+                current_time = time.time() * 1000
+                # Debounce to prevent multiple triggers
+                if current_time - last_barge_in_time[0] > barge_in_debounce_ms:
+                    last_barge_in_time[0] = current_time
+                    print(f"   🎤 User speaking: \"{text[:30]}...\"")
+                    on_barge_in_callback()
     
     def canceled(evt):
         print(f"❌ STT canceled: {evt.result.cancellation_details.reason}")

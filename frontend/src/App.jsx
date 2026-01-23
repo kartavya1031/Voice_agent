@@ -52,6 +52,14 @@ function App() {
     const [phoneCallId, setPhoneCallId] = useState(null)
     const [frejunConfig, setFrejunConfig] = useState({ configured: false, from_number: null })
 
+    // Call History State
+    const [callHistory, setCallHistory] = useState([])
+    const [loadingHistory, setLoadingHistory] = useState(false)
+    const [playingRecordingId, setPlayingRecordingId] = useState(null)
+    const [statusFilter, setStatusFilter] = useState('all')
+    const [dateFilter, setDateFilter] = useState('')
+    const audioPlayerRef = useRef(null)
+
     const fileInputRef = useRef(null)
     // Refs
     const wsRef = useRef(null)
@@ -641,6 +649,125 @@ function App() {
         }))
     }
 
+    // ============================================
+    // Call History Functions
+    // ============================================
+
+    // Fetch call history with recordings
+    const fetchCallHistory = async () => {
+        setLoadingHistory(true)
+        try {
+            const res = await fetch(`${API_URL}/api/calls/history`)
+            const data = await res.json()
+            setCallHistory(data.calls || [])
+        } catch (err) {
+            addLog(`Error fetching call history: ${err.message}`)
+        } finally {
+            setLoadingHistory(false)
+        }
+    }
+
+    // Play recording
+    const playRecording = (call) => {
+        if (!call.recording_url) {
+            addLog('No recording available for this call')
+            return
+        }
+
+        if (playingRecordingId === call.id) {
+            // Stop playing
+            if (audioPlayerRef.current) {
+                audioPlayerRef.current.pause()
+                audioPlayerRef.current.currentTime = 0
+            }
+            setPlayingRecordingId(null)
+        } else {
+            // Start playing new recording - use proxy endpoint to avoid CORS issues
+            if (audioPlayerRef.current) {
+                audioPlayerRef.current.pause()
+            }
+
+            // Use the proxy endpoint instead of direct FreJun URL
+            const proxyUrl = `${API_URL}/api/calls/${call.id}/recording`
+
+            audioPlayerRef.current = new Audio(proxyUrl)
+            audioPlayerRef.current.onended = () => {
+                setPlayingRecordingId(null)
+                addLog('Recording playback finished')
+            }
+            audioPlayerRef.current.onerror = (e) => {
+                console.error('Audio playback error:', e)
+                addLog('Error playing recording - recording may not be available yet')
+                setPlayingRecordingId(null)
+            }
+            audioPlayerRef.current.onloadstart = () => {
+                addLog('Loading recording...')
+            }
+            audioPlayerRef.current.oncanplay = () => {
+                addLog('Playing recording...')
+            }
+            audioPlayerRef.current.play().catch(err => {
+                addLog(`Error: ${err.message}`)
+                setPlayingRecordingId(null)
+            })
+            setPlayingRecordingId(call.id)
+        }
+    }
+
+    // Stop recording playback
+    const stopRecording = () => {
+        if (audioPlayerRef.current) {
+            audioPlayerRef.current.pause()
+            audioPlayerRef.current.currentTime = 0
+        }
+        setPlayingRecordingId(null)
+    }
+
+    // Filter call history
+    const getFilteredCallHistory = () => {
+        return callHistory.filter(call => {
+            // Status filter
+            if (statusFilter !== 'all' && call.status !== statusFilter) {
+                return false
+            }
+            // Date filter
+            if (dateFilter) {
+                const callDate = new Date(call.start_time || call.created_at).toISOString().split('T')[0]
+                if (callDate !== dateFilter) {
+                    return false
+                }
+            }
+            return true
+        })
+    }
+
+    // Get status badge class
+    const getStatusBadgeClass = (status) => {
+        switch (status) {
+            case 'completed': return 'status-badge completed'
+            case 'initiated': return 'status-badge initiated'
+            case 'streaming': return 'status-badge streaming'
+            case 'answered': return 'status-badge answered'
+            case 'failed': return 'status-badge failed'
+            case 'recording_failed': return 'status-badge failed'
+            default: return 'status-badge'
+        }
+    }
+
+    // Format date time for display
+    const formatDateTime = (dateStr) => {
+        if (!dateStr) return 'Unknown'
+        const date = new Date(dateStr)
+        return date.toLocaleString('en-US', {
+            month: '2-digit',
+            day: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        })
+    }
+
     // Format duration
     const formatDuration = (seconds) => {
         const mins = Math.floor(seconds / 60)
@@ -681,9 +808,12 @@ function App() {
                             <span className="nav-icon">🤖</span>
                             <span>Agent</span>
                         </div>
-                        <div className="nav-item">
+                        <div
+                            className={`nav-item ${activeView === 'call-history' ? 'active' : ''}`}
+                            onClick={() => { setActiveView('call-history'); fetchCallHistory(); }}
+                        >
                             <span className="nav-icon">📞</span>
-                            <span>Calls</span>
+                            <span>Call History</span>
                         </div>
                         <div className="nav-item">
                             <span className="nav-icon">📊</span>
@@ -714,9 +844,17 @@ function App() {
                 {/* Header */}
                 <header className="header">
                     <div className="header-content">
-                        <h1 className="welcome-text">{activeView === 'home' ? 'Welcome back, User' : 'Agent Configuration'}</h1>
+                        <h1 className="welcome-text">
+                            {activeView === 'home' ? 'Welcome back, User' :
+                                activeView === 'call-history' ? 'Recent Call History' :
+                                    'Agent Configuration'}
+                        </h1>
                         <div className="header-actions">
-                            <button className="header-btn" onClick={() => { fetchTranscripts(); fetchAgentConfig(); }}>
+                            <button className="header-btn" onClick={() => {
+                                fetchTranscripts();
+                                fetchAgentConfig();
+                                if (activeView === 'call-history') fetchCallHistory();
+                            }}>
                                 🔄 Refresh
                             </button>
                         </div>
@@ -724,7 +862,119 @@ function App() {
                 </header>
                 {/* Content Area */}
                 <div className="content-area">
-                    {activeView === 'agent' ? (
+                    {activeView === 'call-history' ? (
+                        /* Call History View */
+                        <>
+                            {/* Filters Section */}
+                            <section className="section">
+                                <div className="call-history-filters">
+                                    <div className="filter-group">
+                                        <input
+                                            type="date"
+                                            value={dateFilter}
+                                            onChange={(e) => setDateFilter(e.target.value)}
+                                            className="filter-input date-filter"
+                                            placeholder="dd-mm-yyyy"
+                                        />
+                                    </div>
+                                    <div className="filter-group">
+                                        <select
+                                            value={statusFilter}
+                                            onChange={(e) => setStatusFilter(e.target.value)}
+                                            className="filter-select"
+                                        >
+                                            <option value="all">All Status</option>
+                                            <option value="completed">Completed</option>
+                                            <option value="initiated">Initiated</option>
+                                            <option value="answered">Answered</option>
+                                            <option value="failed">Failed</option>
+                                            <option value="streaming">Streaming</option>
+                                        </select>
+                                    </div>
+                                    <button
+                                        className="apply-filter-btn"
+                                        onClick={() => { setDateFilter(''); setStatusFilter('all'); }}
+                                    >
+                                        ✕ Clear Filter
+                                    </button>
+                                </div>
+                            </section>
+
+                            {/* Call History Table */}
+                            <section className="section">
+                                <div className="call-history-table-container">
+                                    {loadingHistory ? (
+                                        <div className="loading-state">
+                                            <div className="loading-spinner"></div>
+                                            <p>Loading call history...</p>
+                                        </div>
+                                    ) : getFilteredCallHistory().length === 0 ? (
+                                        <div className="empty-state">
+                                            <div className="empty-icon">📞</div>
+                                            <h3>No Calls Found</h3>
+                                            <p>No calls match your current filters or no calls have been made yet.</p>
+                                        </div>
+                                    ) : (
+                                        <table className="call-history-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Date & Time</th>
+                                                    <th>Contact</th>
+                                                    <th>Number</th>
+                                                    <th>Duration</th>
+                                                    <th>Status</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {getFilteredCallHistory().map((call) => (
+                                                    <tr key={call.id}>
+                                                        <td className="date-cell">
+                                                            {formatDateTime(call.start_time || call.created_at)}
+                                                        </td>
+                                                        <td className="contact-cell">
+                                                            {call.from_number ? 'Outbound' : 'Unknown'}
+                                                        </td>
+                                                        <td className="number-cell">
+                                                            {call.to_number || call.from_number || 'N/A'}
+                                                        </td>
+                                                        <td className="duration-cell">
+                                                            {call.duration_seconds
+                                                                ? formatDuration(call.duration_seconds)
+                                                                : '0:00'}
+                                                        </td>
+                                                        <td className="status-cell">
+                                                            <span className={getStatusBadgeClass(call.status)}>
+                                                                {call.status || 'unknown'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="actions-cell">
+                                                            <button
+                                                                className={`action-btn view-btn ${call.has_transcript ? '' : 'disabled'}`}
+                                                                onClick={() => call.has_transcript && viewTranscript(call.id)}
+                                                                title={call.has_transcript ? 'View Transcript' : 'No transcript available'}
+                                                                disabled={!call.has_transcript}
+                                                            >
+                                                                👁️
+                                                            </button>
+                                                            <button
+                                                                className={`action-btn play-btn ${call.recording_url ? (playingRecordingId === call.id ? 'playing' : '') : 'disabled'}`}
+                                                                onClick={() => call.recording_url && playRecording(call)}
+                                                                title={call.recording_url ? (playingRecordingId === call.id ? 'Stop Recording' : 'Play Recording') : 'No recording available'}
+                                                                disabled={!call.recording_url}
+                                                            >
+                                                                {playingRecordingId === call.id ? '⏹️' : '▶️'}
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    )}
+                                </div>
+                            </section>
+                        </>
+                    ) : activeView === 'agent' ? (
                         /* Agent Configuration View */
                         <>
                             {/* Speech Settings Section */}
