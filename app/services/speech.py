@@ -1,4 +1,5 @@
 import azure.cognitiveservices.speech as speechsdk
+import threading
 from app.core.config import SPEECH_KEY, SPEECH_REGION
 
 # Default speech settings
@@ -159,18 +160,22 @@ _tts_cache_max_size = 50  # Increased cache size for more phrases
 # Persistent synthesizer for connection reuse (reduces ~50-100ms per call)
 _synthesizer = None
 _synthesizer_voice = None
+_synthesizer_lock = threading.Lock()
 
 
 def _get_synthesizer():
     """Get or create a reusable synthesizer for the current voice."""
     global _synthesizer, _synthesizer_voice
     
-    config = get_speech_config()
-    config.set_speech_synthesis_output_format(
-        speechsdk.SpeechSynthesisOutputFormat.Raw16Khz16BitMonoPcm
-    )
-    
-    if _synthesizer is None or _synthesizer_voice != current_synthesis_voice:
+    with _synthesizer_lock:
+        if _synthesizer is not None and _synthesizer_voice == current_synthesis_voice:
+            return _synthesizer
+        
+        config = get_speech_config()
+        config.set_speech_synthesis_output_format(
+            speechsdk.SpeechSynthesisOutputFormat.Raw16Khz16BitMonoPcm
+        )
+        
         _synthesizer = speechsdk.SpeechSynthesizer(
             speech_config=config,
             audio_config=None
@@ -284,26 +289,48 @@ _telephony_synthesizer = None
 _telephony_synthesizer_voice = None
 _telephony_tts_cache = {}
 _telephony_tts_cache_max_size = 50
+_telephony_synthesizer_lock = threading.Lock()
 
 
-def _get_telephony_synthesizer():
-    """Get or create a reusable telephony synthesizer (8kHz for phone calls)"""
+def _get_telephony_synthesizer(retry_count=3, retry_delay=0.5):
+    """Get or create a reusable telephony synthesizer (8kHz for phone calls)
+    
+    Uses thread lock and retry logic to handle concurrent initialization errors.
+    Error 2176 can occur when Azure SDK resources are initialized concurrently.
+    """
     global _telephony_synthesizer, _telephony_synthesizer_voice
     
-    config = get_speech_config()
-    # Use 8kHz 16-bit mono PCM for telephony (required by FreJun/Teler)
-    config.set_speech_synthesis_output_format(
-        speechsdk.SpeechSynthesisOutputFormat.Raw8Khz16BitMonoPcm
-    )
-    
-    if _telephony_synthesizer is None or _telephony_synthesizer_voice != current_synthesis_voice:
-        _telephony_synthesizer = speechsdk.SpeechSynthesizer(
-            speech_config=config,
-            audio_config=None
-        )
-        _telephony_synthesizer_voice = current_synthesis_voice
-    
-    return _telephony_synthesizer
+    with _telephony_synthesizer_lock:
+        # Return cached synthesizer if valid
+        if _telephony_synthesizer is not None and _telephony_synthesizer_voice == current_synthesis_voice:
+            return _telephony_synthesizer
+        
+        last_error = None
+        for attempt in range(retry_count):
+            try:
+                config = get_speech_config()
+                # Use 8kHz 16-bit mono PCM for telephony (required by FreJun/Teler)
+                config.set_speech_synthesis_output_format(
+                    speechsdk.SpeechSynthesisOutputFormat.Raw8Khz16BitMonoPcm
+                )
+                
+                _telephony_synthesizer = speechsdk.SpeechSynthesizer(
+                    speech_config=config,
+                    audio_config=None
+                )
+                _telephony_synthesizer_voice = current_synthesis_voice
+                return _telephony_synthesizer
+                
+            except Exception as e:
+                last_error = e
+                print(f"   ⚠️ TTS synthesizer init attempt {attempt + 1} failed: {e}")
+                if attempt < retry_count - 1:
+                    import time
+                    time.sleep(retry_delay * (attempt + 1))  # Exponential backoff
+                    # Clear old synthesizer reference
+                    _telephony_synthesizer = None
+        
+        raise RuntimeError(f"Failed to initialize telephony synthesizer after {retry_count} attempts: {last_error}")
 
 
 def text_to_speech_telephony(text: str):
@@ -385,3 +412,40 @@ def text_to_speech_sentence_streaming(llm_stream):
     if sentence_buffer.strip():
         for chunk in text_to_speech_streaming(sentence_buffer.strip()):
             yield chunk
+
+
+# =============================================================================
+# Pre-initialization function - call at app startup to avoid race conditions
+# =============================================================================
+def initialize_speech_services():
+    """
+    Pre-initialize Azure Speech SDK synthesizers at application startup.
+    This prevents race conditions when the first call comes in and both
+    STT (recognizer) and TTS (synthesizer) need to initialize concurrently.
+    
+    Error 2176 occurs when Azure SDK resources are initialized simultaneously.
+    Pre-warming synthesizers during startup avoids this issue.
+    """
+    import time
+    print("🔊 Pre-initializing Azure Speech services...")
+    start_time = time.time()
+    
+    try:
+        # Initialize regular synthesizer (16kHz)
+        _get_synthesizer()
+        print("   ✅ Regular TTS synthesizer (16kHz) ready")
+    except Exception as e:
+        print(f"   ⚠️ Regular TTS init warning: {e}")
+    
+    # Small delay between initializations to avoid conflicts
+    time.sleep(0.3)
+    
+    try:
+        # Initialize telephony synthesizer (8kHz)
+        _get_telephony_synthesizer()
+        print("   ✅ Telephony TTS synthesizer (8kHz) ready")
+    except Exception as e:
+        print(f"   ⚠️ Telephony TTS init warning: {e}")
+    
+    elapsed = (time.time() - start_time) * 1000
+    print(f"🔊 Speech services initialized in {elapsed:.0f}ms")

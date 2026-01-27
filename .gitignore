@@ -7,3 +7,4 @@ app/data/chroma_db/
 *.bin
 *.sqlite3
 env311/
+/venv/

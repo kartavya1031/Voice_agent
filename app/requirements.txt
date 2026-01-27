@@ -10,8 +10,7 @@ python-multipart==0.0.6
 openai==1.12.0
 
 # Azure Speech Services
-# Version 1.47.0+ required for OpenSSL 3.0 compatibility (fixes Error 2176)
-azure-cognitiveservices-speech>=1.47.0
+azure-cognitiveservices-speech==1.35.0
 
 # Vector Store (ChromaDB)
 chromadb==0.4.22
@@ -26,12 +25,11 @@ cryptography==42.0.2
 python-dotenv==1.0.0
 
 # PDF Processing (for knowledge base upload)
-pymupdf==1.23.22  # Required for PDF processing (import fitz)
-pdfplumber==0.10.4  # Fallback for PDF processing
+PyPDF2==3.0.1
 
 # Utilities
 pydantic==2.5.3
-# pydantic-settings==2.1.0  # Unused
+pydantic-settings==2.1.0
 
 # CORS
 starlette==0.35.1
@@ -42,6 +40,3 @@ anyio==4.2.0
 
 # WebSocket
 websockets==12.0
-
-# Audio (for client scripts)
-sounddevice==0.4.6

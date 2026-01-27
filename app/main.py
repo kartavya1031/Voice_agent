@@ -74,6 +74,11 @@ def startup_event():
         print(f"📚 Loaded active knowledge base: {active_kb.name}")
     
     print(f"🗣️ Speech settings loaded: lang={speech_settings.recognition_language}, voice={speech_settings.synthesis_voice_name}")
+    
+    # Pre-initialize Azure Speech services to avoid race conditions during first call
+    # Error 2176 can occur when STT and TTS are initialized concurrently
+    from app.services.speech import initialize_speech_services
+    initialize_speech_services()
 
 # Configurable Call Settings (can be changed via API)
 class CallSettings:
@@ -561,6 +566,8 @@ def get_available_voices():
         # Hindi
         {"id": "hi-IN-SwaraNeural", "name": "Swara (Hindi, Female)", "language": "hi-IN"},
         {"id": "hi-IN-MadhurNeural", "name": "Madhur (Hindi, Male)", "language": "hi-IN"},
+        {"id": "hi-IN-AartiNeural", "name": "Aarti (Hindi, Female)", "language": "hi-IN"},
+        {"id": "hi-IN-KavyaNeural", "name": "Kavya (Hindi, Female)", "language": "hi-IN"},
         # Spanish
         {"id": "es-ES-ElviraNeural", "name": "Elvira (Spanish, Female)", "language": "es-ES"},
         {"id": "es-MX-DaliaNeural", "name": "Dalia (Mexican Spanish, Female)", "language": "es-MX"},

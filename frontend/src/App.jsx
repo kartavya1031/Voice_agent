@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import './App.css'
-const API_URL = 'http://127.0.0.1:8000'
-const WS_URL = 'ws://127.0.0.1:8000/ws/audio'
+const API_URL = 'https://voice.anvenssa.com'
+const WS_URL = 'wss://voice.anvenssa.com/ws/audio'
 function App() {
 
     // State
