@@ -18,14 +18,12 @@ from app.core.config import (
 )
 
 # Persist directory for ChromaDB
-PERSIST_DIR = Path(__file__).parent.parent / "data" / "chroma_db"
+# Changed to v3 to avoid sqlite schema conflicts with previous version
+PERSIST_DIR = Path(__file__).parent.parent / "data" / "chroma_db_v3"
 
 # Knowledge base files directory
 KB_FILES_DIR = Path(__file__).parent.parent / "data" / "knowledge_bases"
 KB_FILES_DIR.mkdir(parents=True, exist_ok=True)
-
-# Initialize ChromaDB client
-client = chromadb.PersistentClient(path=str(PERSIST_DIR))
 
 # Extract base endpoint (remove the /deployments/... part if present)
 base_endpoint = AZURE_OPENAI_ENDPOINT
@@ -43,6 +41,69 @@ embedding_fn = embedding_functions.OpenAIEmbeddingFunction(
 
 # Default collection for backward compatibility
 DEFAULT_COLLECTION_NAME = "anvenssa_knowledge"
+
+
+def _check_and_clean_chromadb():
+    """Check ChromaDB schema compatibility and clean if needed BEFORE creating client"""
+    import shutil
+    import sqlite3
+    
+    db_path = PERSIST_DIR / "chroma.sqlite3"
+    
+    if not db_path.exists():
+        # No existing database, nothing to check
+        return
+    
+    try:
+        # Directly connect to SQLite to check schema (without ChromaDB locking it)
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.cursor()
+        
+        # Check if 'collections' table has the expected schema
+        # Try to select from collections table with the 'topic' column that new ChromaDB expects
+        try:
+            cursor.execute("SELECT topic FROM collections LIMIT 1")
+        except sqlite3.OperationalError as e:
+            if "no such column" in str(e):
+                print(f"⚠️ ChromaDB schema mismatch detected: {e}")
+                print(f"🔄 Cleaning incompatible database before startup...")
+                conn.close()
+                # Delete the entire chroma_db directory
+                if PERSIST_DIR.exists():
+                    shutil.rmtree(PERSIST_DIR)
+                print(f"✅ Old database cleaned. Fresh database will be created.")
+                return
+            raise
+        
+        conn.close()
+    except sqlite3.OperationalError as e:
+        # Database might be corrupt or have other issues
+        print(f"⚠️ ChromaDB database check failed: {e}")
+        print(f"🔄 Cleaning potentially corrupt database...")
+        try:
+            if PERSIST_DIR.exists():
+                shutil.rmtree(PERSIST_DIR)
+            print(f"✅ Database cleaned.")
+        except Exception as cleanup_error:
+            print(f"❌ Could not clean database: {cleanup_error}")
+    except Exception as e:
+        print(f"⚠️ Unexpected error checking ChromaDB: {e}")
+
+
+def _init_chromadb_client():
+    """Initialize ChromaDB client with automatic schema mismatch recovery"""
+    # First, check and clean any incompatible database BEFORE creating client
+    _check_and_clean_chromadb()
+    
+    persist_path = str(PERSIST_DIR)
+    
+    # Now safely create the client
+    client = chromadb.PersistentClient(path=persist_path)
+    return client
+
+
+# Initialize ChromaDB client with automatic recovery
+client = _init_chromadb_client()
 
 # Get or create default collection
 collection = client.get_or_create_collection(
@@ -68,7 +129,10 @@ def get_collection_for_kb(kb_id: str):
 
 def set_active_knowledge_base(kb_id: Optional[str]):
     """Set the active knowledge base to use for queries"""
-    global active_collection, active_kb_id
+    global active_collection, active_kb_id, _search_cache
+    
+    # Clear the search cache when switching knowledge bases
+    _search_cache = {}
     
     if kb_id is None:
         # Use default collection
@@ -79,6 +143,83 @@ def set_active_knowledge_base(kb_id: Optional[str]):
         active_collection = get_collection_for_kb(kb_id)
         active_kb_id = kb_id
         print(f"📚 Switched to knowledge base: {kb_id}")
+        print(f"   📊 Collection: {active_collection.name}, Chunks: {active_collection.count()}")
+        
+        # Check if collection is empty and reload from file if needed
+        if active_collection.count() == 0:
+            print(f"   ⚠️ Collection is empty, attempting to reload from file...")
+            _reload_kb_from_file(kb_id)
+            _reload_kb_from_file(kb_id)
+
+
+def _reload_kb_from_file(kb_id: str):
+    """Reload a knowledge base from saved PDF file if collection is empty"""
+    global active_collection
+    
+    try:
+        # Find the PDF file for this KB
+        import fitz  # PyMuPDF
+        from app.services.agent_config import agent_config_service
+        
+        # Get KB info from config
+        kb_info = None
+        for kb in agent_config_service.get_knowledge_bases():
+            if kb.id == kb_id:
+                kb_info = kb
+                break
+        
+        if not kb_info:
+            print(f"   ❌ KB {kb_id} not found in config")
+            return
+        
+        # Find the file
+        file_path = KB_FILES_DIR / f"{kb_id}_{kb_info.filename}"
+        if not file_path.exists():
+            print(f"   ❌ KB file not found: {file_path}")
+            return
+        
+        print(f"   📄 Reloading from: {file_path}")
+        
+        # Extract text from PDF
+        text_content = ""
+        with open(file_path, 'rb') as f:
+            content = f.read()
+        
+        if kb_info.filename.lower().endswith('.pdf'):
+            pdf_doc = fitz.open(stream=content, filetype="pdf")
+            for page in pdf_doc:
+                text_content += page.get_text()
+            pdf_doc.close()
+        elif kb_info.filename.lower().endswith(('.txt', '.md')):
+            text_content = content.decode('utf-8', errors='ignore')
+        
+        if not text_content.strip():
+            print(f"   ❌ No text content extracted from file")
+            return
+        
+        # Chunk and add to collection
+        chunks = chunk_text(text_content)
+        if not chunks:
+            print(f"   ❌ No chunks generated from text")
+            return
+        
+        ids = [f"{kb_id}_chunk_{i}" for i in range(len(chunks))]
+        
+        active_collection.add(
+            documents=chunks,
+            ids=ids,
+            metadatas=[{"kb_id": kb_id, "name": kb_info.name, "chunk_index": i} for i in range(len(chunks))]
+        )
+        
+        print(f"   ✅ Reloaded KB with {len(chunks)} chunks")
+        
+        # Update config with correct chunk count
+        agent_config_service.update_knowledge_base_chunks(kb_id, len(chunks))
+        
+    except ImportError:
+        print(f"   ❌ PyMuPDF not installed - cannot reload PDF")
+    except Exception as e:
+        print(f"   ❌ Error reloading KB: {e}")
 
 
 def create_knowledge_base_from_text(kb_id: str, name: str, content: str) -> int:
@@ -136,41 +277,99 @@ def get_kb_file_path(kb_id: str, filename: str) -> Path:
     return KB_FILES_DIR / f"{kb_id}_{filename}"
 
 
-def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> list[str]:
-    """Split text into overlapping chunks for better retrieval"""
+def chunk_text(text: str, chunk_size: int = 800, overlap: int = 100) -> list[str]:
+    """Split text into chunks optimized for Q&A retrieval
+    
+    Strategy:
+    1. First try to split by numbered questions (1., 2., etc.)
+    2. Then by section headers (##)
+    3. Finally by paragraph if chunks are too large
+    """
     chunks = []
     
-    # Split by sections (## headers)
-    sections = text.split("\n## ")
+    # Try to split by numbered Q&A format first (common in knowledge bases)
+    # Pattern: "1." or "1)" at start of line
+    qa_pattern = re.compile(r'\n(?=\d+[\.\)]\s)')
+    qa_sections = qa_pattern.split(text)
     
-    for i, section in enumerate(sections):
-        if i > 0:
-            section = "## " + section
-        
-        # If section is small enough, keep as is
-        if len(section) <= chunk_size:
-            chunks.append(section.strip())
-        else:
-            # Split into smaller chunks with overlap
-            words = section.split()
-            current_chunk = []
-            current_len = 0
-            
-            for word in words:
-                current_chunk.append(word)
-                current_len += len(word) + 1
+    if len(qa_sections) > 1:
+        # Q&A format detected
+        for i, section in enumerate(qa_sections):
+            section = section.strip()
+            if not section:
+                continue
                 
-                if current_len >= chunk_size:
-                    chunks.append(" ".join(current_chunk))
-                    # Keep last few words for overlap
-                    overlap_words = current_chunk[-overlap//10:] if overlap > 0 else []
-                    current_chunk = overlap_words
-                    current_len = sum(len(w) + 1 for w in current_chunk)
+            # Add question number back if it was split
+            if i > 0 and not re.match(r'^\d+[\.\)]', section):
+                # Find what number this should be
+                pass  # The split keeps content after the number
             
-            if current_chunk:
-                chunks.append(" ".join(current_chunk))
+            if len(section) <= chunk_size:
+                chunks.append(section)
+            else:
+                # Split large Q&A into smaller parts but keep Q with first part of A
+                words = section.split()
+                current_chunk = []
+                current_len = 0
+                
+                for word in words:
+                    current_chunk.append(word)
+                    current_len += len(word) + 1
+                    
+                    if current_len >= chunk_size:
+                        chunks.append(" ".join(current_chunk))
+                        # Keep last few words for overlap
+                        overlap_words = current_chunk[-(overlap//5):] if overlap > 0 else []
+                        current_chunk = overlap_words
+                        current_len = sum(len(w) + 1 for w in current_chunk)
+                
+                if current_chunk:
+                    chunks.append(" ".join(current_chunk))
+    else:
+        # Fallback: Split by sections (## headers)
+        sections = text.split("\n## ")
+        
+        for i, section in enumerate(sections):
+            if i > 0:
+                section = "## " + section
+            
+            section = section.strip()
+            if not section:
+                continue
+            
+            # If section is small enough, keep as is
+            if len(section) <= chunk_size:
+                chunks.append(section)
+            else:
+                # Split into smaller chunks with overlap
+                words = section.split()
+                current_chunk = []
+                current_len = 0
+                
+                for word in words:
+                    current_chunk.append(word)
+                    current_len += len(word) + 1
+                    
+                    if current_len >= chunk_size:
+                        chunks.append(" ".join(current_chunk))
+                        # Keep last few words for overlap
+                        overlap_words = current_chunk[-(overlap//5):] if overlap > 0 else []
+                        current_chunk = overlap_words
+                        current_len = sum(len(w) + 1 for w in current_chunk)
+                
+                if current_chunk:
+                    chunks.append(" ".join(current_chunk))
     
-    return [c for c in chunks if c.strip()]
+    # Final cleanup: remove empty chunks and deduplicate
+    seen = set()
+    unique_chunks = []
+    for c in chunks:
+        c = c.strip()
+        if c and c not in seen:
+            seen.add(c)
+            unique_chunks.append(c)
+    
+    return unique_chunks
 
 
 def load_knowledge_base():
@@ -210,6 +409,7 @@ def load_knowledge_base():
 # LRU Cache for search results (avoids repeated embedding+search for same query)
 from functools import lru_cache
 import hashlib
+import re
 
 # Cache key generator (includes active KB ID for proper cache isolation)
 def _get_cache_key(query: str) -> str:
@@ -221,10 +421,104 @@ def _get_cache_key(query: str) -> str:
 _search_cache = {}
 _cache_max_size = 50
 
+# Hindi-English keyword mapping for better retrieval
+KEYWORD_MAP = {
+    # Interest rate related
+    'ब्याज': ['byaj', 'interest', 'rate', 'dar'],
+    'interest': ['byaj', 'interest', 'rate', 'dar'],
+    'rate': ['byaj', 'interest', 'rate', 'dar'],
+    'रेट': ['byaj', 'interest', 'rate', 'dar'],
+    # Loan related
+    'लोन': ['loan', 'top-up', 'refinance'],
+    'loan': ['loan', 'top-up', 'refinance'],
+    'टॉप अप': ['top-up', 'topup', 'top up'],
+    'top up': ['top-up', 'topup', 'top up'],
+    # Documents
+    'डॉक्यूमेंट': ['document', 'documents', 'dastavez', 'papers'],
+    'document': ['document', 'documents', 'dastavez', 'papers'],
+    'कागज': ['document', 'documents', 'dastavez', 'papers'],
+    # Bank related
+    'बैंक': ['bank', 'banks', 'nbfc', 'hdfc', 'icici', 'axis'],
+    'bank': ['bank', 'banks', 'nbfc', 'hdfc', 'icici', 'axis'],
+    # Tenure/duration
+    'साल': ['saal', 'year', 'tenure', 'duration', 'mahine'],
+    'tenure': ['saal', 'year', 'tenure', 'duration', 'mahine'],
+    'अवधि': ['saal', 'year', 'tenure', 'duration', 'mahine'],
+    # CIBIL/Credit
+    'सिबिल': ['cibil', 'credit', 'score', 'civil'],
+    'cibil': ['cibil', 'credit', 'score', 'civil'],
+    'क्रेडिट': ['cibil', 'credit', 'score'],
+    # Foreclosure
+    'फोरक्लोज़': ['foreclose', 'foreclosure', 'close', 'jaldi', 'band'],
+    'क्लोज़': ['foreclose', 'foreclosure', 'close', 'jaldi', 'band'],
+    'close': ['foreclose', 'foreclosure', 'close', 'jaldi', 'band'],
+    # Flat/Reducing
+    'फ्लैट': ['flat', 'reducing', 'byaj'],
+    'flat': ['flat', 'reducing', 'byaj'],
+    'रिड्यूसिंग': ['flat', 'reducing', 'byaj'],
+}
+
+
+def _extract_keywords(query: str) -> list[str]:
+    """Extract and expand keywords from query"""
+    query_lower = query.lower()
+    keywords = set()
+    
+    # Check for known keywords and their mappings
+    for key, expansions in KEYWORD_MAP.items():
+        if key.lower() in query_lower:
+            keywords.update(expansions)
+    
+    # Also add individual words from query
+    words = re.findall(r'\w+', query_lower)
+    keywords.update(words)
+    
+    return list(keywords)
+
+
+def _calculate_keyword_score(doc: str, keywords: list[str]) -> float:
+    """Calculate keyword match score for a document"""
+    if not keywords:
+        return 0.0
+    
+    doc_lower = doc.lower()
+    matches = sum(1 for kw in keywords if kw in doc_lower)
+    return matches / len(keywords)
+
+
+def _rerank_results(query: str, documents: list[str], distances: list[float]) -> list[tuple[str, float]]:
+    """Rerank results using hybrid scoring (semantic + keyword)"""
+    if not documents:
+        return []
+    
+    keywords = _extract_keywords(query)
+    results = []
+    
+    for doc, distance in zip(documents, distances):
+        # Semantic score (convert distance to similarity, lower distance = higher similarity)
+        # ChromaDB returns L2 distance, so we invert it
+        semantic_score = 1.0 / (1.0 + distance)
+        
+        # Keyword score
+        keyword_score = _calculate_keyword_score(doc, keywords)
+        
+        # Combined score: 60% semantic + 40% keyword
+        combined_score = (0.6 * semantic_score) + (0.4 * keyword_score)
+        
+        results.append((doc, combined_score))
+    
+    # Sort by combined score (highest first)
+    results.sort(key=lambda x: x[1], reverse=True)
+    
+    return results
+
 
 def search_knowledge(query: str, n_results: int = 2) -> list[str]:
-    """Search active knowledge base for relevant context (with caching)"""
+    """Search active knowledge base for relevant context (with caching and reranking)"""
     global active_collection, _search_cache
+    
+    # Log which KB is being searched
+    print(f"   🔍 Searching KB: {active_kb_id or 'default'} (collection: {active_collection.name})")
     
     # Check cache first
     cache_key = _get_cache_key(query)
@@ -240,18 +534,36 @@ def search_knowledge(query: str, n_results: int = 2) -> list[str]:
         if active_kb_id is None:
             load_knowledge_base()
     
+    print(f"   📊 Collection has {target_collection.count()} chunks")
+    
     if target_collection.count() == 0:
         return []
     
-    # Reduced n_results from 3 to 2 for speed
+    # Fetch more candidates for reranking (3x requested)
+    fetch_count = min(n_results * 3, target_collection.count())
+    
     results = target_collection.query(
         query_texts=[query],
-        n_results=n_results
+        n_results=fetch_count,
+        include=["documents", "distances"]
     )
     
     result_docs = []
-    if results and results['documents']:
-        result_docs = results['documents'][0]
+    if results and results['documents'] and results['documents'][0]:
+        docs = results['documents'][0]
+        distances = results.get('distances', [[0] * len(docs)])[0]
+        
+        # Rerank using hybrid scoring
+        reranked = _rerank_results(query, docs, distances)
+        
+        # Take top n_results
+        result_docs = [doc for doc, score in reranked[:n_results]]
+        
+        # Log reranking info
+        if reranked:
+            print(f"   🎯 Reranked: top score={reranked[0][1]:.3f}")
+    
+    print(f"   📝 Found {len(result_docs)} relevant chunks")
     
     # Cache the result
     if len(_search_cache) >= _cache_max_size:

@@ -154,12 +154,25 @@ async def initiate_call(request: InitiateCallRequest, req: Request):
                 if frejun_call_id and frejun_call_id != call_id:
                     active_calls[frejun_call_id] = active_calls[call_id]
                 
+                # Save call to database with phone numbers
+                from app.db.service import call_service
+                try:
+                    call_record = call_service.create_call(
+                        call_provider="frejun",
+                        provider_call_id=frejun_call_id,
+                        from_number=FREJUN_FROM_NUMBER,
+                        to_number=to_number
+                    )
+                    print(f"💾 Call saved to database with ID: {call_record.id}")
+                except Exception as db_error:
+                    print(f"⚠️ Could not save call to database: {db_error}")
+                
                 print(f"✅ FreJun call initiated: {call_id} (FreJun ID: {frejun_call_id})")
                 print(f"   To: {to_number}, From: {FREJUN_FROM_NUMBER}")
                 
                 return InitiateCallResponse(
                     success=True,
-                    call_id=call_id,
+                    call_id=frejun_call_id,  # Return FreJun's call_id for webhook matching
                     message=f"Call initiated to {to_number}"
                 )
             else:

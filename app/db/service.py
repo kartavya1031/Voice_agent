@@ -1,10 +1,11 @@
 """
-Database service for managing call records and transcripts
+Database service for managing call records, transcripts, and users
 """
 from datetime import datetime
 from typing import List, Optional
+import hashlib
 from sqlalchemy.orm import Session
-from app.db.models import Call, CallTranscript, CallFile, CallMetric
+from app.db.models import Call, CallTranscript, CallFile, CallMetric, User
 from app.db.session import SessionLocal
 
 
@@ -16,12 +17,14 @@ class CallService:
         call_provider: str = "websocket",
         provider_call_id: Optional[str] = None,
         from_number: Optional[str] = None,
-        to_number: Optional[str] = None
+        to_number: Optional[str] = None,
+        user_id: Optional[str] = None
     ) -> Call:
         """Create a new call record"""
         db = SessionLocal()
         try:
             call = Call(
+                user_id=user_id,
                 call_provider=call_provider,
                 provider_call_id=provider_call_id,
                 from_number=from_number,
@@ -313,5 +316,220 @@ class CallService:
             db.close()
 
 
-# Singleton instance
+class UserService:
+    """Service for managing user accounts in the database"""
+    
+    @staticmethod
+    def hash_password(password: str) -> str:
+        """Hash a password using SHA-256"""
+        return hashlib.sha256(password.encode()).hexdigest()
+    
+    @staticmethod
+    def create_user(
+        username: str,
+        password: str,
+        role: str = "client",
+        display_name: Optional[str] = None,
+        email: Optional[str] = None
+    ) -> Optional[User]:
+        """Create a new user"""
+        db = SessionLocal()
+        try:
+            # Check if username already exists
+            existing = db.query(User).filter(User.username == username).first()
+            if existing:
+                print(f"❌ User '{username}' already exists")
+                return None
+            
+            user = User(
+                username=username,
+                password_hash=UserService.hash_password(password),
+                role=role,
+                display_name=display_name or username,
+                email=email
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            print(f"✅ User created: {username} (role: {role})")
+            return user
+        except Exception as e:
+            db.rollback()
+            print(f"❌ Error creating user: {e}")
+            raise
+        finally:
+            db.close()
+    
+    @staticmethod
+    def authenticate(username: str, password: str) -> Optional[dict]:
+        """Authenticate a user and return user info if successful"""
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(
+                User.username == username,
+                User.is_active == True
+            ).first()
+            
+            if not user:
+                return None
+            
+            password_hash = UserService.hash_password(password)
+            if user.password_hash != password_hash:
+                return None
+            
+            # Update last login
+            user.last_login = datetime.utcnow()
+            db.commit()
+            
+            return {
+                "id": user.id,
+                "username": user.username,
+                "role": user.role,
+                "display_name": user.display_name,
+                "email": user.email
+            }
+        except Exception as e:
+            print(f"❌ Authentication error: {e}")
+            return None
+        finally:
+            db.close()
+    
+    @staticmethod
+    def get_user_by_username(username: str) -> Optional[User]:
+        """Get a user by username"""
+        db = SessionLocal()
+        try:
+            return db.query(User).filter(User.username == username).first()
+        finally:
+            db.close()
+    
+    @staticmethod
+    def get_user_by_id(user_id: str) -> Optional[User]:
+        """Get a user by ID"""
+        db = SessionLocal()
+        try:
+            return db.query(User).filter(User.id == user_id).first()
+        finally:
+            db.close()
+    
+    @staticmethod
+    def get_all_users() -> List[dict]:
+        """Get all users"""
+        db = SessionLocal()
+        try:
+            users = db.query(User).order_by(User.created_at.desc()).all()
+            return [
+                {
+                    "id": u.id,
+                    "username": u.username,
+                    "role": u.role,
+                    "display_name": u.display_name,
+                    "email": u.email,
+                    "is_active": u.is_active,
+                    "last_login": u.last_login.isoformat() if u.last_login else None,
+                    "created_at": u.created_at.isoformat() if u.created_at else None
+                }
+                for u in users
+            ]
+        finally:
+            db.close()
+    
+    @staticmethod
+    def update_user(
+        user_id: str,
+        display_name: Optional[str] = None,
+        email: Optional[str] = None,
+        role: Optional[str] = None,
+        is_active: Optional[bool] = None
+    ) -> Optional[User]:
+        """Update user details"""
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                return None
+            
+            if display_name is not None:
+                user.display_name = display_name
+            if email is not None:
+                user.email = email
+            if role is not None:
+                user.role = role
+            if is_active is not None:
+                user.is_active = is_active
+            
+            db.commit()
+            db.refresh(user)
+            print(f"✅ User updated: {user.username}")
+            return user
+        except Exception as e:
+            db.rollback()
+            print(f"❌ Error updating user: {e}")
+            raise
+        finally:
+            db.close()
+    
+    @staticmethod
+    def update_password(user_id: str, new_password: str) -> bool:
+        """Update user password"""
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                return False
+            
+            user.password_hash = UserService.hash_password(new_password)
+            db.commit()
+            print(f"✅ Password updated for user: {user.username}")
+            return True
+        except Exception as e:
+            db.rollback()
+            print(f"❌ Error updating password: {e}")
+            return False
+        finally:
+            db.close()
+    
+    @staticmethod
+    def delete_user(user_id: str) -> bool:
+        """Delete a user"""
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                return False
+            
+            username = user.username
+            db.delete(user)
+            db.commit()
+            print(f"✅ User deleted: {username}")
+            return True
+        except Exception as e:
+            db.rollback()
+            print(f"❌ Error deleting user: {e}")
+            return False
+        finally:
+            db.close()
+    
+    @staticmethod
+    def ensure_admin_exists():
+        """Ensure at least one admin user exists (create default if not)"""
+        db = SessionLocal()
+        try:
+            admin = db.query(User).filter(User.role == "admin").first()
+            if not admin:
+                # Create default admin user
+                UserService.create_user(
+                    username="Agentx",
+                    password="Anvenssa@123",
+                    role="admin",
+                    display_name="AgentX Admin"
+                )
+                print("✅ Default admin user created: Agentx")
+        finally:
+            db.close()
+
+
+# Singleton instances
 call_service = CallService()
+user_service = UserService()
+

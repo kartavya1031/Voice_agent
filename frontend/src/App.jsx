@@ -1,8 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import './App.css'
-const API_URL = 'https://voice.anvenssa.com'
-const WS_URL = 'wss://voice.anvenssa.com/ws/audio'
+import { useAuth } from './auth/AuthContext.jsx'
+// const API_URL = 'https://voice.anvenssa.com'
+// const WS_URL = 'wss://voice.anvenssa.com/ws/audio'
+const API_URL = 'http://localhost:8000'
+const WS_URL = 'ws://localhost:8000/ws/audio'
 function App() {
+
+    // Authentication
+    const { user, logout } = useAuth();
 
     // State
     const [isConnected, setIsConnected] = useState(false)
@@ -754,13 +760,16 @@ function App() {
         }
     }
 
-    // Format date time for display
+    // Format date time for display in IST
     const formatDateTime = (dateStr) => {
         if (!dateStr) return 'Unknown'
-        const date = new Date(dateStr)
-        return date.toLocaleString('en-US', {
-            month: '2-digit',
+        // Ensure the date string is treated as UTC if no timezone is specified
+        const utcDateStr = dateStr.endsWith('Z') ? dateStr : `${dateStr}Z`;
+        const date = new Date(utcDateStr)
+        return date.toLocaleString('en-IN', {
+            timeZone: 'Asia/Kolkata',
             day: '2-digit',
+            month: '2-digit',
             year: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
@@ -845,7 +854,7 @@ function App() {
                 <header className="header">
                     <div className="header-content">
                         <h1 className="welcome-text">
-                            {activeView === 'home' ? 'Welcome back, User' :
+                            {activeView === 'home' ? `Welcome back, ${user?.displayName || 'User'}` :
                                 activeView === 'call-history' ? 'Recent Call History' :
                                     'Agent Configuration'}
                         </h1>
@@ -857,6 +866,16 @@ function App() {
                             }}>
                                 🔄 Refresh
                             </button>
+                            <div className="user-menu">
+                                <span className="user-badge">
+                                    <span className="user-avatar">👤</span>
+                                    <span className="user-name">{user?.displayName}</span>
+                                    <span className="user-role">{user?.role}</span>
+                                </span>
+                                <button className="header-btn logout-btn" onClick={logout}>
+                                    🚪 Logout
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </header>

@@ -142,12 +142,12 @@ def get_system_prompt() -> str:
     return agent_config_service.get_resolved_system_prompt()
 
 
-# Keywords that should skip RAG lookup (fast path)
+# Keywords that should skip RAG lookup (fast path) - only greetings, not questions
 SKIP_RAG_KEYWORDS = [
     "hello", "hi", "hey", "bye", "goodbye", "thanks", "thank you",
     "yes", "no", "okay", "ok", "sure", "fine", "good", "great",
     "how are you", "what's up", "help", "sorry", "please",
-    "what", "who", "test", "testing", "nahi", "haan"
+    "test", "testing", "nahi", "haan"
 ]
 
 
@@ -235,6 +235,13 @@ CRITICAL VOICE AGENT RULES:
 5. Never use quotation marks, asterisks, brackets, or any formatting in your speech.
 6. Check conversation history to know where you are in the script - do NOT repeat greetings.
 7. Handle edge cases EXACTLY as defined in the system prompt (wrong person, busy, etc.).
+
+STRICT KNOWLEDGE BASE RULES - VERY IMPORTANT:
+8. ONLY use information from the CONTEXT provided. Do NOT make up or guess numbers, rates, tenures, documents, or any other details.
+9. If the answer is NOT in the CONTEXT, say "Main abhi yeh information confirm nahi kar sakta, lekin aap humari team se baat kar sakte hain" or similar. NEVER invent information.
+10. Use EXACT numbers and details from the knowledge base - do not round, estimate, or modify them.
+11. If asked about interest rate, tenure, documents, banks, etc. - ONLY state what is written in the CONTEXT. If not present, admit you don't have that specific information.
+12. NEVER hallucinate or fabricate any factual information like percentages, years, bank names, or document lists.
 """
     
     # Build system message
@@ -302,7 +309,8 @@ def ask_ai(text: str) -> str:
         model=DEPLOYMENT_NAME,
         messages=messages,
         max_tokens=150,  # Reduced for speed
-        temperature=0.5  # Reduced for faster sampling
+        temperature=0.1,  # Very low for factual responses
+        top_p=0.9
     )
     return response.choices[0].message.content
 
@@ -319,12 +327,18 @@ def ask_ai_streaming_parallel(text: str):
     import time
     start_time = time.time()
     
-    # Skip RAG for conversational prompts (system prompt has all needed info)
-    # RAG is only useful when there's a knowledge base with additional facts
+    # Get active KB info for logging
+    from app.services.vector_store import get_active_kb_info
+    kb_info = get_active_kb_info()
+    
     context = ""
     
-    if not should_skip_rag(text):
-        # Try RAG but don't let it delay the response too much
+    if should_skip_rag(text):
+        print(f"   ⏩ Skipping RAG (simple query: '{text[:30]}...')")
+    else:
+        # Try RAG - get context from active knowledge base
+        print(f"   🔍 Searching KB: {kb_info.get('kb_id', 'default')} ({kb_info.get('chunk_count', 0)} chunks)")
+        
         rag_result = [None]
         rag_done = threading.Event()
         
@@ -335,6 +349,8 @@ def ask_ai_streaming_parallel(text: str):
                 rag_time = (time.time() - rag_start) * 1000
                 if rag_result[0]:
                     print(f"   📚 RAG found context ({rag_time:.0f}ms): {rag_result[0][:100]}...")
+                else:
+                    print(f"   📭 No relevant context found in KB ({rag_time:.0f}ms)")
             except Exception as e:
                 print(f"   ⚠️ RAG error: {e}")
                 rag_result[0] = ""
@@ -342,7 +358,7 @@ def ask_ai_streaming_parallel(text: str):
                 rag_done.set()
         
         threading.Thread(target=fetch_rag, daemon=True).start()
-        rag_done.wait(timeout=0.5)  # Wait max 500ms for RAG (was 50ms - too short!)
+        rag_done.wait(timeout=3.0)  # Wait max 3 seconds for RAG - MUST have context to avoid hallucination
         
         if rag_done.is_set() and rag_result[0]:
             context = rag_result[0]
@@ -357,7 +373,8 @@ def ask_ai_streaming_parallel(text: str):
         model=DEPLOYMENT_NAME,
         messages=messages,
         max_tokens=300,      # Increased for scripted conversations with verification blocks
-        temperature=0.4,     # Reduced from 0.5 for faster sampling
+        temperature=0.1,     # Very low for factual, KB-based responses - prevents hallucination
+        top_p=0.9,           # Nucleus sampling for more focused responses
         stream=True
     )
     

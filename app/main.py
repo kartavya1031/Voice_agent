@@ -40,13 +40,14 @@ from app.services.agent_config import agent_config_service
 from app.db.service import call_service
 from app.api.frejun import router as frejun_router
 from app.api.webhooks import router as webhooks_router
+from app.api.auth import router as auth_router
 
 app = FastAPI(title="Anvenssa Voice Agent API")
 
-# Include FreJun API router
+# Include API routers
 app.include_router(frejun_router)
-# Include Webhooks router for stream/recording events
 app.include_router(webhooks_router)
+app.include_router(auth_router)
 
 # CORS for React frontend
 app.add_middleware(
@@ -61,6 +62,10 @@ app.add_middleware(
 @app.on_event("startup")
 def startup_event():
     """Initialize settings from saved config"""
+    # Initialize database
+    from app.db.session import init_db
+    init_db()
+    
     speech_settings = agent_config_service.get_speech_settings()
     update_speech_settings(
         recognition_language=speech_settings.recognition_language,
@@ -503,6 +508,27 @@ async def create_knowledge_base(
         traceback.print_exc()
         return {"error": str(e)}
         
+@app.post("/api/agent/knowledge-bases/{kb_id}/activate")
+def activate_knowledge_base(kb_id: str):
+    """Activate a specific knowledge base"""
+    # Verify KB exists
+    kbs = agent_config_service.get_knowledge_bases()
+    kb_exists = any(kb.id == kb_id for kb in kbs)
+    
+    if not kb_exists:
+        print(f"📚 ❌ Knowledge base not found: {kb_id}")
+        return {"error": "Knowledge base not found"}
+    
+    # Set active in config (persists)
+    agent_config_service.set_active_knowledge_base(kb_id)
+    
+    # Set active in vector store (runtime)
+    set_active_knowledge_base(kb_id)
+    
+    print(f"📚 ✅ Activated knowledge base: {kb_id}")
+    return {"success": True, "active_id": kb_id}
+
+
 @app.post("/api/agent/knowledge-bases/deactivate")
 def deactivate_knowledge_base():
     """Deactivate custom knowledge base, use default"""

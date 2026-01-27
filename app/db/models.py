@@ -3,7 +3,7 @@ Database models for AI Voice Calls
 """
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, Text, TIMESTAMP, ForeignKey, Enum
+from sqlalchemy import Column, String, Integer, Text, TIMESTAMP, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from app.db.session import Base
 
@@ -13,15 +13,39 @@ def generate_uuid():
     return str(uuid.uuid4())
 
 
+class User(Base):
+    """User model for authentication and access control"""
+    __tablename__ = "users"
+    
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    username = Column(String(50), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)  # Store hashed passwords
+    role = Column(String(20), nullable=False, default='client')  # 'admin', 'client'
+    display_name = Column(String(100), nullable=True)
+    email = Column(String(100), nullable=True)
+    is_active = Column(Boolean, default=True)
+    last_login = Column(TIMESTAMP, nullable=True)
+    created_at = Column(TIMESTAMP, default=datetime.utcnow)
+    updated_at = Column(TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    calls = relationship("Call", back_populates="user")
+    
+    def __repr__(self):
+        return f"<User(id={self.id}, username={self.username}, role={self.role})>"
+
+
 class Call(Base):
     """Main call record"""
     __tablename__ = "calls"
     
     id = Column(String(36), primary_key=True, default=generate_uuid)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=True)  # Link to user who made the call
     call_provider = Column(String(20), nullable=True)  # 'websocket', 'twilio', etc.
     provider_call_id = Column(String(100), nullable=True)
     from_number = Column(String(20), nullable=True)
     to_number = Column(String(20), nullable=True)
+    contact_name = Column(String(100), nullable=True)  # Optional contact name
     start_time = Column(TIMESTAMP, nullable=True)
     end_time = Column(TIMESTAMP, nullable=True)
     duration_seconds = Column(Integer, nullable=True)
@@ -33,6 +57,7 @@ class Call(Base):
     created_at = Column(TIMESTAMP, default=datetime.utcnow)
     
     # Relationships
+    user = relationship("User", back_populates="calls")
     transcripts = relationship("CallTranscript", back_populates="call", cascade="all, delete-orphan")
     files = relationship("CallFile", back_populates="call", cascade="all, delete-orphan")
     metrics = relationship("CallMetric", back_populates="call", cascade="all, delete-orphan", uselist=False)
@@ -91,3 +116,4 @@ class CallMetric(Base):
     
     def __repr__(self):
         return f"<CallMetric(call_id={self.call_id}, interruptions={self.interruption_count})>"
+
