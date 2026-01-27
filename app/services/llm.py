@@ -7,12 +7,14 @@ OPTIMIZATIONS APPLIED:
 2. Reduced max_tokens (150) and temperature (0.5) for faster responses
 3. LRU cache for embeddings (in vector_store.py)
 4. Optimized system prompt
+5. Conversation history for multi-turn dialogue
 """
 
 import time
 import threading
 import queue
 from functools import lru_cache
+from typing import List, Dict, Optional, Generator
 from openai import AzureOpenAI
 from app.core.config import (
     AZURE_OPENAI_KEY,
@@ -22,18 +24,122 @@ from app.core.config import (
 from app.services.vector_store import get_context_for_query
 from app.services.agent_config import agent_config_service
 
-# Create client with optimized settings
+# Create client with optimized settings for low latency
+# Using httpx with connection pooling and keepalive
+import httpx
+
+# Custom HTTP client with connection pooling (keeps connections warm)
+http_client = httpx.Client(
+    timeout=httpx.Timeout(15.0, connect=5.0),
+    limits=httpx.Limits(max_keepalive_connections=5, keepalive_expiry=30.0),
+)
+
 client = AzureOpenAI(
     api_key=AZURE_OPENAI_KEY,
     azure_endpoint=AZURE_OPENAI_ENDPOINT,
     api_version="2024-02-15-preview",
-    timeout=15.0,  # Faster timeout
+    timeout=15.0,
+    http_client=http_client,  # Reuse connections
 )
 
 
+# =============================================================================
+# CONVERSATION HISTORY MANAGER
+# Maintains chat history for multi-turn conversations
+# =============================================================================
+class ConversationManager:
+    """Manages conversation history for a call session.
+    
+    This is critical for scripted conversations where the LLM needs to know
+    where it is in the conversation flow (e.g., already asked opening question,
+    now need to ask verification questions).
+    """
+    
+    def __init__(self, max_history: int = 20):
+        """Initialize with max history limit to avoid token overflow."""
+        self.history: List[Dict[str, str]] = []
+        self.max_history = max_history
+    
+    def add_user_message(self, content: str):
+        """Add a user message to history."""
+        if content and content.strip():
+            self.history.append({"role": "user", "content": content})
+            self._trim_history()
+    
+    def add_assistant_message(self, content: str):
+        """Add an assistant message to history."""
+        if content and content.strip():
+            self.history.append({"role": "assistant", "content": content})
+            self._trim_history()
+    
+    def _trim_history(self):
+        """Keep only the most recent messages to avoid token overflow."""
+        if len(self.history) > self.max_history:
+            # Keep most recent messages
+            self.history = self.history[-self.max_history:]
+    
+    def get_messages(self) -> List[Dict[str, str]]:
+        """Get a copy of the conversation history."""
+        return list(self.history)
+    
+    def clear(self):
+        """Clear conversation history (for new call)."""
+        self.history = []
+    
+    def __len__(self):
+        return len(self.history)
+
+
+# Global conversation manager instance (will be reset per call)
+_conversation_manager: Optional[ConversationManager] = None
+
+
+def get_conversation_manager() -> ConversationManager:
+    """Get or create the conversation manager."""
+    global _conversation_manager
+    if _conversation_manager is None:
+        _conversation_manager = ConversationManager()
+    return _conversation_manager
+
+
+def reset_conversation():
+    """Reset conversation history (call this at start of each new call)."""
+    global _conversation_manager
+    _conversation_manager = ConversationManager()
+
+
+def add_to_conversation(role: str, content: str):
+    """Add a message to conversation history."""
+    manager = get_conversation_manager()
+    if role == "user":
+        manager.add_user_message(content)
+    elif role == "assistant":
+        manager.add_assistant_message(content)
+
+
+def _warmup_llm_connection():
+    """Pre-warm the LLM connection to reduce first-call latency"""
+    try:
+        # Make a minimal call to establish the connection
+        response = client.chat.completions.create(
+            model=DEPLOYMENT_NAME,
+            messages=[{"role": "user", "content": "hi"}],
+            max_tokens=1,
+            temperature=0,
+        )
+        print("🔥 LLM connection pre-warmed!")
+    except Exception as e:
+        print(f"⚠️ LLM warmup failed (will work on first real call): {e}")
+
+
+# Warmup on module load (runs in background thread to not block startup)
+import threading
+threading.Thread(target=_warmup_llm_connection, daemon=True).start()
+
+
 def get_system_prompt() -> str:
-    """Get the current system prompt from config"""
-    return agent_config_service.get_system_prompt()
+    """Get the current system prompt from config with variables substituted"""
+    return agent_config_service.get_resolved_system_prompt()
 
 
 # Keywords that should skip RAG lookup (fast path)
@@ -104,26 +210,82 @@ def should_skip_rag(query: str) -> bool:
     return False
 
 
-def build_prompt_with_context(user_query: str, context: str = "") -> list[dict]:
-    """Build messages with optional RAG context"""
+def build_prompt_with_context(user_query: str, context: str = "", include_history: bool = True) -> list[dict]:
+    """Build messages with optional RAG context and conversation history.
+    
+    Args:
+        user_query: The current user message
+        context: RAG context (if any)
+        include_history: Whether to include conversation history for multi-turn dialogue
+    
+    Returns:
+        List of messages for the LLM
+    """
     system_prompt = get_system_prompt()
     
-    # Build system message with context (truncate to 800 chars max for speed)
+    # CRITICAL: Voice agent behavior instructions
+    # Follow the system prompt EXACTLY - it defines all behavior, responses, and edge cases
+    voice_agent_suffix = """
+
+CRITICAL VOICE AGENT RULES:
+1. FOLLOW THE SYSTEM PROMPT EXACTLY - it contains all sections, scripts, and edge cases you must follow.
+2. ONLY output spoken words. Never output meta-instructions like "Take a pause", "Set variable", or stage directions.
+3. ASK ONE QUESTION AT A TIME, then STOP and wait for the user's response.
+4. After asking a question, DO NOT continue. Wait for user input.
+5. Never use quotation marks, asterisks, brackets, or any formatting in your speech.
+6. Check conversation history to know where you are in the script - do NOT repeat greetings.
+7. Handle edge cases EXACTLY as defined in the system prompt (wrong person, busy, etc.).
+"""
+    
+    # Build system message
     if context:
         context_truncated = context[:800] if len(context) > 800 else context
-        system_content = f"""{system_prompt}
-
-CONTEXT:
-{context_truncated}
-
-Be brief and conversational."""
+        system_content = f"{system_prompt}\n{voice_agent_suffix}\nCONTEXT:\n{context_truncated}"
     else:
-        system_content = system_prompt
+        system_content = f"{system_prompt}\n{voice_agent_suffix}"
     
-    return [
-        {"role": "system", "content": system_content},
-        {"role": "user", "content": user_query}
+    messages = [{"role": "system", "content": system_content}]
+    
+    # Add conversation history for multi-turn conversations
+    if include_history:
+        manager = get_conversation_manager()
+        history = manager.get_messages()
+        if history:
+            messages.extend(history)
+    
+    # Add current user message
+    messages.append({"role": "user", "content": user_query})
+    
+    return messages
+
+
+def clean_llm_output(text: str) -> str:
+    """
+    Clean LLM output to remove meta-instructions and formatting.
+    This ensures only speakable content is sent to TTS.
+    """
+    import re
+    
+    # Remove common meta-instructions that shouldn't be spoken
+    patterns_to_remove = [
+        r'Take a pause for \d+ seconds?\.?',
+        r'\[.*?\]',  # Remove anything in square brackets
+        r'\(.*?\)',  # Remove anything in parentheses (stage directions)
+        r'^\s*"',    # Remove leading quotes
+        r'"\s*$',    # Remove trailing quotes
+        r'\*.*?\*',  # Remove anything between asterisks
     ]
+    
+    cleaned = text
+    for pattern in patterns_to_remove:
+        cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE)
+    
+    # Clean up extra whitespace
+    cleaned = re.sub(r'\n\s*\n', '\n', cleaned)  # Multiple newlines to single
+    cleaned = re.sub(r'\s+', ' ', cleaned)  # Multiple spaces to single
+    cleaned = cleaned.strip()
+    
+    return cleaned
 
 
 def ask_ai(text: str) -> str:
@@ -157,13 +319,12 @@ def ask_ai_streaming_parallel(text: str):
     import time
     start_time = time.time()
     
-    # Check if we should skip RAG
-    if should_skip_rag(text):
-        print(f"   ⚡ Skipping RAG for simple query: '{text}'")
-        context = ""
-        messages = build_prompt_with_context(text, context)
-    else:
-        # Start RAG in background thread
+    # Skip RAG for conversational prompts (system prompt has all needed info)
+    # RAG is only useful when there's a knowledge base with additional facts
+    context = ""
+    
+    if not should_skip_rag(text):
+        # Try RAG but don't let it delay the response too much
         rag_result = [None]
         rag_done = threading.Event()
         
@@ -173,41 +334,30 @@ def ask_ai_streaming_parallel(text: str):
                 rag_result[0] = get_context_for_query(text)
                 rag_time = (time.time() - rag_start) * 1000
                 if rag_result[0]:
-                    print(f"   📚 RAG (parallel): {rag_time:.0f}ms ({len(rag_result[0])} chars)")
-                else:
-                    print(f"   📚 RAG (parallel): {rag_time:.0f}ms (no context)")
+                    print(f"   📚 RAG found context ({rag_time:.0f}ms): {rag_result[0][:100]}...")
             except Exception as e:
                 print(f"   ⚠️ RAG error: {e}")
                 rag_result[0] = ""
             finally:
                 rag_done.set()
         
-        # Start RAG thread
         threading.Thread(target=fetch_rag, daemon=True).start()
-        
-        # DON'T WAIT for RAG - start LLM immediately with base prompt
-        # This is the key optimization: we overlap RAG and LLM network calls
-        
-        # Wait just a tiny bit (50ms) to see if RAG returns fast
-        rag_done.wait(timeout=0.05)
+        rag_done.wait(timeout=0.5)  # Wait max 500ms for RAG (was 50ms - too short!)
         
         if rag_done.is_set() and rag_result[0]:
-            # RAG returned quickly, use it
             context = rag_result[0]
-            print(f"   ✨ RAG returned in <50ms, including context")
-        else:
-            # RAG is slow, start without context
-            context = ""
-            print(f"   🚀 Starting LLM without waiting for RAG")
-        
-        messages = build_prompt_with_context(text, context)
+            print(f"   ✅ Using RAG context: {len(context)} chars")
+        elif not rag_done.is_set():
+            print(f"   ⏰ RAG timeout - proceeding without context")
+    
+    messages = build_prompt_with_context(text, context)
     
     # Stream LLM response with optimized parameters
     response = client.chat.completions.create(
         model=DEPLOYMENT_NAME,
         messages=messages,
-        max_tokens=150,      # Reduced from 200 for speed
-        temperature=0.5,     # Reduced from 0.7 for faster sampling
+        max_tokens=300,      # Increased for scripted conversations with verification blocks
+        temperature=0.4,     # Reduced from 0.5 for faster sampling
         stream=True
     )
     
@@ -221,22 +371,32 @@ def ask_ai_streaming_parallel(text: str):
 # Keep old function name for backward compatibility
 def ask_ai_streaming(text: str):
     """
-    Stream LLM response with optimizations:
-    1. Check instant response cache first (0ms latency)
-    2. Fall back to parallel RAG + LLM
+    Stream LLM response - follows the dynamic system prompt strictly.
     """
-    # Check for instant response first (greetings, farewells, etc.)
-    instant = get_instant_response(text)
-    if instant:
-        print(f"   ⚡ INSTANT RESPONSE (cached): '{text}' -> 0ms latency!")
-        # Yield the response word by word to simulate streaming
-        words = instant.split()
-        for i, word in enumerate(words):
-            if i < len(words) - 1:
-                yield word + " "
-            else:
-                yield word
+    start_time = time.time()
+    
+    # Special handling for agent-first opening message
+    if text == "START_CONVERSATION":
+        opening_query = "Begin the conversation with your opening script. Say only the opening greeting - do not continue beyond asking if you are speaking to the right person."
+        yield from ask_ai_streaming_parallel(opening_query)
         return
     
-    # Fall back to parallel RAG + LLM
-    yield from ask_ai_streaming_parallel(text)
+    # Check if using custom/dynamic prompt
+    prompt_variables = agent_config_service.get_prompt_variables()
+    has_custom_prompt = bool(prompt_variables and any(v for v in prompt_variables.values() if v))
+    
+    if has_custom_prompt:
+        # Dynamic prompt mode: ALWAYS use LLM to follow the prompt strictly
+        # Skip instant responses - agent behavior is defined in the prompt
+        yield from ask_ai_streaming_parallel(text)
+    else:
+        # Default mode: use instant responses for common phrases
+        instant = get_instant_response(text)
+        if instant:
+            print(f"⚡ CACHED: '{text[:30]}...' -> 0ms")
+            words = instant.split()
+            for i, word in enumerate(words):
+                yield word + (" " if i < len(words) - 1 else "")
+            return
+        yield from ask_ai_streaming_parallel(text)
+

@@ -26,6 +26,10 @@ class Call(Base):
     end_time = Column(TIMESTAMP, nullable=True)
     duration_seconds = Column(Integer, nullable=True)
     end_reason = Column(String(50), nullable=True)  # 'user_intent', 'silence_timeout', 'max_duration', 'user_hangup'
+    status = Column(String(30), default='initiated')  # 'initiated', 'ringing', 'answered', 'completed', 'failed'
+    recording_url = Column(Text, nullable=True)  # URL to call recording from FreJun
+    recording_id = Column(String(100), nullable=True)  # Recording ID from FreJun
+    stream_id = Column(String(100), nullable=True)  # Stream ID from FreJun
     created_at = Column(TIMESTAMP, default=datetime.utcnow)
     
     # Relationships

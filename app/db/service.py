@@ -154,6 +154,163 @@ class CallService:
             raise
         finally:
             db.close()
+    
+    @staticmethod
+    def update_call_status(
+        call_id: str,
+        status: str
+    ) -> Optional[Call]:
+        """Update call status"""
+        db = SessionLocal()
+        try:
+            call = db.query(Call).filter(Call.id == call_id).first()
+            if not call:
+                # Try to find by provider_call_id
+                call = db.query(Call).filter(Call.provider_call_id == call_id).first()
+            if call:
+                call.status = status
+                db.commit()
+                db.refresh(call)
+                print(f"📊 Call status updated: {call.id} -> {status}")
+                return call
+            return None
+        except Exception as e:
+            db.rollback()
+            print(f"❌ Error updating call status: {e}")
+            raise
+        finally:
+            db.close()
+    
+    @staticmethod
+    def update_call_phone_numbers(
+        call_id: str,
+        from_number: Optional[str] = None,
+        to_number: Optional[str] = None,
+        provider_call_id: Optional[str] = None
+    ) -> Optional[Call]:
+        """Update call phone numbers and provider call ID"""
+        db = SessionLocal()
+        try:
+            call = db.query(Call).filter(Call.id == call_id).first()
+            if not call:
+                # Try to find by provider_call_id
+                call = db.query(Call).filter(Call.provider_call_id == call_id).first()
+            if call:
+                if from_number:
+                    call.from_number = from_number
+                if to_number:
+                    call.to_number = to_number
+                if provider_call_id:
+                    call.provider_call_id = provider_call_id
+                db.commit()
+                db.refresh(call)
+                print(f"📞 Call phone numbers updated: {call.id} -> {from_number} -> {to_number}")
+                return call
+            return None
+        except Exception as e:
+            db.rollback()
+            print(f"❌ Error updating call phone numbers: {e}")
+            raise
+        finally:
+            db.close()
+    
+    @staticmethod
+    def update_call_recording(
+        call_id: str,
+        recording_url: str,
+        recording_id: Optional[str] = None
+    ) -> Optional[Call]:
+        """Update call recording URL"""
+        db = SessionLocal()
+        try:
+            call = db.query(Call).filter(Call.id == call_id).first()
+            if not call:
+                # Try to find by provider_call_id
+                call = db.query(Call).filter(Call.provider_call_id == call_id).first()
+            if call:
+                call.recording_url = recording_url
+                if recording_id:
+                    call.recording_id = recording_id
+                db.commit()
+                db.refresh(call)
+                print(f"🎙️ Call recording updated: {call.id}")
+                return call
+            return None
+        except Exception as e:
+            db.rollback()
+            print(f"❌ Error updating call recording: {e}")
+            raise
+        finally:
+            db.close()
+    
+    @staticmethod
+    def update_call_stream(
+        call_id: str,
+        stream_id: str
+    ) -> Optional[Call]:
+        """Update call stream ID"""
+        db = SessionLocal()
+        try:
+            call = db.query(Call).filter(Call.id == call_id).first()
+            if not call:
+                # Try to find by provider_call_id
+                call = db.query(Call).filter(Call.provider_call_id == call_id).first()
+            if call:
+                call.stream_id = stream_id
+                db.commit()
+                db.refresh(call)
+                print(f"📡 Call stream updated: {call.id} -> {stream_id}")
+                return call
+            return None
+        except Exception as e:
+            db.rollback()
+            print(f"❌ Error updating call stream: {e}")
+            raise
+        finally:
+            db.close()
+    
+    @staticmethod
+    def get_call_by_provider_id(provider_call_id: str) -> Optional[Call]:
+        """Get a call by provider call ID"""
+        db = SessionLocal()
+        try:
+            return db.query(Call).filter(Call.provider_call_id == provider_call_id).first()
+        finally:
+            db.close()
+    
+    @staticmethod
+    def get_calls_with_details(limit: int = 50) -> List[dict]:
+        """Get recent calls with all details including recording URLs"""
+        db = SessionLocal()
+        try:
+            calls = db.query(Call).order_by(Call.created_at.desc()).limit(limit).all()
+            result = []
+            for call in calls:
+                # Get transcript for this call
+                transcript = db.query(CallTranscript).filter(
+                    CallTranscript.call_id == call.id,
+                    CallTranscript.speaker == "full"
+                ).first()
+                
+                result.append({
+                    "id": call.id,
+                    "provider_call_id": call.provider_call_id,
+                    "from_number": call.from_number,
+                    "to_number": call.to_number,
+                    "start_time": call.start_time.isoformat() if call.start_time else None,
+                    "end_time": call.end_time.isoformat() if call.end_time else None,
+                    "duration_seconds": call.duration_seconds,
+                    "status": call.status or "unknown",
+                    "end_reason": call.end_reason,
+                    "recording_url": call.recording_url,
+                    "recording_id": call.recording_id,
+                    "stream_id": call.stream_id,
+                    "has_transcript": transcript is not None,
+                    "created_at": call.created_at.isoformat() if call.created_at else None
+                })
+            return result
+        finally:
+            db.close()
 
 
 # Singleton instance
