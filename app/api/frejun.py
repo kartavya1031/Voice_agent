@@ -244,6 +244,9 @@ async def get_incoming_call_flow(req: Request):
     """
     Handle incoming calls from FreJun Voice App.
     This is the Incoming Call URL configured in the FreJun platform.
+    
+    MULTI-TENANT: Looks up the agent by the called phone number (to_number)
+    and passes the agent_id in the WebSocket URL for agent-specific handling.
     """
     # Get base URL for WebSocket
     base_url = os.getenv("PUBLIC_BASE_URL", str(req.base_url).rstrip("/"))
@@ -254,7 +257,49 @@ async def get_incoming_call_flow(req: Request):
     else:
         ws_url = base_url.replace("http://", "ws://")
     
+    # Try to get agent by phone number from request body or query params
+    agent_id = None
+    to_number = None
+    from_number = None
+    call_id = None
+    
+    try:
+        # Try to get call details from request body (FreJun may POST call info)
+        if req.method == "POST":
+            try:
+                body = await req.json()
+                to_number = body.get("to_number") or body.get("to") or body.get("called_number")
+                from_number = body.get("from_number") or body.get("from") or body.get("caller_number")
+                call_id = body.get("call_id")
+                print(f"📞 Incoming call: from={from_number}, to={to_number}, call_id={call_id}")
+            except:
+                pass
+        else:
+            # GET request - check query params
+            to_number = req.query_params.get("to_number") or req.query_params.get("to")
+            from_number = req.query_params.get("from_number") or req.query_params.get("from")
+            call_id = req.query_params.get("call_id")
+        
+        # Lookup agent by the called phone number
+        if to_number:
+            from app.db.service import agent_service
+            agent = agent_service.get_agent_by_phone(to_number)
+            if agent:
+                agent_id = agent.id
+                print(f"   🤖 Found agent for {to_number}: {agent.name} (ID: {agent_id})")
+            else:
+                print(f"   ⚠️ No agent configured for phone: {to_number}, using default")
+    except Exception as e:
+        print(f"   ⚠️ Error looking up agent: {e}")
+    
+    # Build WebSocket URL with optional agent_id
     ws_url = f"{ws_url}/ws/frejun-audio"
+    if agent_id:
+        ws_url = f"{ws_url}?agent_id={agent_id}"
+        if call_id:
+            ws_url = f"{ws_url}&call_id={call_id}"
+    elif call_id:
+        ws_url = f"{ws_url}?call_id={call_id}"
     
     print(f"📋 FreJun incoming call request ({req.method})")
     print(f"   Returning WebSocket URL: {ws_url}")

@@ -1,3 +1,8 @@
+import warnings
+# Suppress SQLAlchemy warnings that cause uvicorn to think startup failed
+warnings.filterwarnings("ignore", category=UserWarning, module="sqlalchemy")
+warnings.filterwarnings("ignore", message=".*Background on this error.*")
+
 from fastapi import FastAPI, WebSocket, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -41,6 +46,7 @@ from app.db.service import call_service
 from app.api.frejun import router as frejun_router
 from app.api.webhooks import router as webhooks_router
 from app.api.auth import router as auth_router
+from app.api.agents import router as agents_router  # NEW: Multi-tenant agent management
 
 app = FastAPI(title="Anvenssa Voice Agent API")
 
@@ -48,6 +54,7 @@ app = FastAPI(title="Anvenssa Voice Agent API")
 app.include_router(frejun_router)
 app.include_router(webhooks_router)
 app.include_router(auth_router)
+app.include_router(agents_router)  # NEW
 
 # CORS for React frontend
 app.add_middleware(
@@ -185,10 +192,15 @@ def list_calls():
 
 
 @app.get("/api/calls/history")
-def get_call_history():
-    """Get call history with full details including recordings and transcripts"""
+def get_call_history(organization_id: Optional[str] = None):
+    """
+    Get call history with full details including recordings and transcripts.
+    
+    MULTI-TENANT: If organization_id is provided, only returns calls for agents
+    belonging to that organization.
+    """
     try:
-        calls = call_service.get_calls_with_details(limit=50)
+        calls = call_service.get_calls_with_details(limit=50, organization_id=organization_id)
         return {"calls": calls, "total": len(calls)}
     except Exception as e:
         return {"error": str(e), "calls": [], "total": 0}
@@ -733,11 +745,58 @@ def health():
 
 
 @app.websocket("/ws/audio")
-async def audio_ws(ws: WebSocket):
+async def audio_ws(ws: WebSocket, agent_id: str = None):
+    """
+    Browser-based audio WebSocket.
+    
+    MULTI-TENANT: Accepts agent_id query parameter to load agent-specific config.
+    If no agent_id is provided, uses global/default settings.
+    """
     global current_turn_id
     
+    # =========================================================================
+    # MULTI-TENANT: Parse agent_id from query string and load configuration
+    # =========================================================================
+    if agent_id is None:
+        agent_id = ws.query_params.get("agent_id")
+    
+    # Agent-specific configuration (defaults to global settings)
+    agent_config = {
+        "system_prompt": None,  # Will use default if None
+        "kb_id": None,  # Knowledge base ID
+        "recognition_language": "en-IN",
+        "synthesis_voice": "en-IN-NeerjaNeural",
+        "agent_name": "Default Agent",
+        "max_call_duration": 10 * 60,  # 10 minutes
+        "max_silence_duration": 20,  # 20 seconds
+    }
+    
+    if agent_id:
+        try:
+            from app.db.service import agent_service
+            agent = agent_service.get_agent(agent_id)
+            if agent:
+                print(f"   🤖 Browser call - Loading agent: {agent.name} (ID: {agent_id})")
+                agent_config["agent_name"] = agent.name
+                agent_config["system_prompt"] = agent.get_resolved_system_prompt()  # Use resolved prompt with variables
+                agent_config["kb_id"] = agent.active_kb_id
+                agent_config["recognition_language"] = agent.recognition_language or "en-IN"
+                agent_config["synthesis_voice"] = agent.synthesis_voice_name or "en-IN-NeerjaNeural"
+                agent_config["max_call_duration"] = agent.max_call_duration or 600
+                agent_config["max_silence_duration"] = agent.max_silence_duration or 20
+                print(f"   📚 KB: {agent_config['kb_id']}, Voice: {agent_config['synthesis_voice']}")
+            else:
+                print(f"   ⚠️ Agent {agent_id} not found, using defaults")
+        except Exception as e:
+            print(f"   ⚠️ Error loading agent config: {e}")
+    else:
+        print(f"   ℹ️ Browser call - No agent_id provided, using default configuration")
+    
+    # Agent-specific conversation history (not global!)
+    agent_conversation_history = []
+    
     await ws.accept()
-    print("🔗 WebSocket connected")
+    print(f"🔗 Browser WebSocket connected (Agent: {agent_config['agent_name']})")
 
     loop = asyncio.get_running_loop()
     
@@ -755,12 +814,40 @@ async def audio_ws(ws: WebSocket):
     # Create call record in database
     call_id = None
     try:
-        call_record = call_service.create_call(call_provider="websocket")
+        call_record = call_service.create_call(
+            call_provider="websocket",
+            agent_id=agent_id  # Link call to specific agent
+        )
         call_id = call_record.id
-        print(f"📞 Call started with ID: {call_id}")
+        print(f"📞 Browser call started with ID: {call_id}, Agent: {agent_config['agent_name']}")
         
-        # Reset conversation history for this new call
-        reset_conversation()
+        # MULTI-TENANT: Update global settings for this call based on agent config
+        # This ensures the existing LLM and TTS functions use agent-specific settings
+        if agent_id and agent_config["system_prompt"]:
+            from app.services.speech import update_speech_settings
+            from app.services.llm import set_system_prompt
+            from app.services.vector_store import set_active_knowledge_base
+            
+            # Update speech settings to use agent's voice
+            update_speech_settings(
+                recognition_language=agent_config["recognition_language"],
+                synthesis_voice=agent_config["synthesis_voice"]
+            )
+            
+            # Update LLM system prompt to use agent's prompt
+            set_system_prompt(agent_config["system_prompt"])
+            
+            # IMPORTANT: Set the active knowledge base for this agent
+            if agent_config["kb_id"]:
+                set_active_knowledge_base(agent_config["kb_id"])
+                print(f"   📚 Activated KB: {agent_config['kb_id']}")
+            
+            # Reset conversation with agent-specific settings
+            reset_conversation()
+            print(f"   ✅ Applied agent config: Voice={agent_config['synthesis_voice']}, KB={agent_config['kb_id']}")
+        elif not agent_id:
+            # Only reset global for backward compatibility if no agent specified
+            reset_conversation()
     except Exception as e:
         print(f"⚠️ Could not create call record: {e}")
     
@@ -1257,6 +1344,8 @@ async def frejun_audio_ws(ws: WebSocket):
     """
     WebSocket handler for FreJun media streaming.
     
+    MULTI-TENANT: Accepts agent_id query parameter to load agent-specific config.
+    
     FreJun sends:
     - {"type": "start", ...} - Stream metadata
     - {"type": "audio", "data": {"audio_b64": "..."}} - Audio chunks
@@ -1271,6 +1360,46 @@ async def frejun_audio_ws(ws: WebSocket):
     print(f"🔗 FreJun WebSocket connection attempt from: {ws.client}")
     print(f"   Headers: {dict(ws.headers)}")
     
+    # =========================================================================
+    # MULTI-TENANT: Parse agent_id from query string and load configuration
+    # =========================================================================
+    agent_id = ws.query_params.get("agent_id")
+    query_call_id = ws.query_params.get("call_id")
+    
+    # Agent-specific configuration (defaults to global settings)
+    agent_config = {
+        "system_prompt": None,  # Will use default if None
+        "kb_id": None,  # Knowledge base ID
+        "recognition_language": "en-IN",
+        "synthesis_voice": "en-IN-NeerjaNeural",
+        "agent_name": "Default Agent",
+        "max_call_duration": 10 * 60,  # 10 minutes
+        "max_silence_duration": 20,  # 20 seconds
+    }
+    
+    if agent_id:
+        try:
+            from app.db.service import agent_service
+            agent = agent_service.get_agent(agent_id)
+            if agent:
+                print(f"   🤖 Loading agent: {agent.name} (ID: {agent_id})")
+                agent_config["agent_name"] = agent.name
+                agent_config["system_prompt"] = agent.system_prompt
+                agent_config["kb_id"] = agent.active_knowledge_base_id
+                agent_config["recognition_language"] = agent.recognition_language or "en-IN"
+                agent_config["synthesis_voice"] = agent.synthesis_voice_name or "en-IN-NeerjaNeural"
+                agent_config["max_call_duration"] = agent.max_call_duration or 600
+                agent_config["max_silence_duration"] = agent.max_silence_duration or 20
+                print(f"   📚 KB: {agent_config['kb_id']}, Voice: {agent_config['synthesis_voice']}")
+            else:
+                print(f"   ⚠️ Agent {agent_id} not found, using defaults")
+        except Exception as e:
+            print(f"   ⚠️ Error loading agent config: {e}")
+    else:
+        print(f"   ℹ️ No agent_id provided, using default configuration")
+    
+    # Agent-specific conversation history (not global!)
+    agent_conversation_history = []
     
     try:
         # Accept the WebSocket connection
@@ -1297,13 +1426,16 @@ async def frejun_audio_ws(ws: WebSocket):
     # Import active_calls from frejun API
     from app.api.frejun import active_calls
     
-    # Create call record in database
+    # Create call record in database (with agent_id if available)
     call_id = None
     try:
-        call_record = call_service.create_call(call_provider="frejun")
+        call_record = call_service.create_call(
+            call_provider="frejun",
+            agent_id=agent_id  # Link call to specific agent
+        )
         call_id = call_record.id
-        print(f"📞 FreJun call started with ID: {call_id}")
-        reset_conversation()
+        print(f"📞 FreJun call started with ID: {call_id}, Agent: {agent_config['agent_name']}")
+        # Note: We use agent_conversation_history instead of global reset_conversation()
     except Exception as e:
         print(f"⚠️ Could not create call record: {e}")
     
@@ -1356,7 +1488,8 @@ async def frejun_audio_ws(ws: WebSocket):
             "text": text,
             "timestamp": datetime.now().strftime("%H:%M:%S")
         })
-        add_to_conversation("user", text)
+        # MULTI-TENANT: Use per-call history instead of global
+        agent_conversation_history.append({"role": "user", "content": text})
         
         # Check for end intent
         if detect_end_intent_simple(text):
@@ -1367,7 +1500,9 @@ async def frejun_audio_ws(ws: WebSocket):
                 "timestamp": datetime.now().strftime("%H:%M:%S")
             })
             
-            for audio_chunk in text_to_speech_telephony(goodbye_msg):
+            # MULTI-TENANT: Use agent-specific voice
+            from app.services.speech import text_to_speech_telephony_for_agent
+            for audio_chunk in text_to_speech_telephony_for_agent(goodbye_msg, agent_config["synthesis_voice"]):
                 await send_audio_to_frejun(audio_chunk)
             
             end_reason[0] = "user_intent"
@@ -1389,9 +1524,22 @@ async def frejun_audio_ws(ws: WebSocket):
                     sentence_end_pattern = re.compile(r'[.!?]\s*')
                     full_llm_response = ""
                     
-                    print(f"   🤖 LLM streaming...")
+                    print(f"   🤖 LLM streaming for agent: {agent_config['agent_name']}...")
                     
-                    for token in ask_ai_streaming(text):
+                    # MULTI-TENANT: Use agent-specific LLM function if agent has custom config
+                    from app.services.llm import ask_ai_streaming_for_agent, get_system_prompt
+                    
+                    # Get system prompt (agent-specific or default)
+                    system_prompt = agent_config["system_prompt"]
+                    if not system_prompt:
+                        system_prompt = get_system_prompt()  # Use default
+                    
+                    for token in ask_ai_streaming_for_agent(
+                        text=text,
+                        system_prompt=system_prompt,
+                        history=agent_conversation_history,
+                        kb_id=agent_config["kb_id"]
+                    ):
                         if my_turn_id != current_turn_id:
                             print("⚡ BARGE-IN: LLM stopped")
                             return
@@ -1408,7 +1556,7 @@ async def frejun_audio_ws(ws: WebSocket):
                             if sentence:
                                 sentence = clean_llm_output(sentence)
                                 if sentence:
-                                    for audio_chunk in text_to_speech_telephony(sentence):
+                                    for audio_chunk in text_to_speech_telephony_for_agent(sentence, agent_config["synthesis_voice"]):
                                         if my_turn_id != current_turn_id:
                                             return
                                         audio_queue.put(audio_chunk)
@@ -1417,7 +1565,7 @@ async def frejun_audio_ws(ws: WebSocket):
                     if remaining:
                         remaining = clean_llm_output(remaining)
                         if remaining:
-                            for audio_chunk in text_to_speech_telephony(remaining):
+                            for audio_chunk in text_to_speech_telephony_for_agent(remaining, agent_config["synthesis_voice"]):
                                 if my_turn_id != current_turn_id:
                                     return
                                 audio_queue.put(audio_chunk)
@@ -1458,7 +1606,8 @@ async def frejun_audio_ws(ws: WebSocket):
                     "text": agent_response[0],
                     "timestamp": datetime.now().strftime("%H:%M:%S")
                 })
-                add_to_conversation("assistant", agent_response[0])
+                # MULTI-TENANT: Use per-call history
+                agent_conversation_history.append({"role": "assistant", "content": agent_response[0]})
                 
                 if detect_end_intent_simple(agent_response[0]):
                     end_reason[0] = "conversation_complete"

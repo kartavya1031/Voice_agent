@@ -30,6 +30,7 @@ class CreateUserRequest(BaseModel):
     role: str = "client"
     display_name: Optional[str] = None
     email: Optional[str] = None
+    organization_id: Optional[str] = None  # Link user to organization
 
 
 class UpdateUserRequest(BaseModel):
@@ -37,6 +38,7 @@ class UpdateUserRequest(BaseModel):
     email: Optional[str] = None
     role: Optional[str] = None
     is_active: Optional[bool] = None
+    organization_id: Optional[str] = None  # Allow updating organization
 
 
 class UpdatePasswordRequest(BaseModel):
@@ -56,7 +58,7 @@ async def login(request: LoginRequest):
         return LoginResponse(
             success=True,
             message="Login successful",
-            user=user
+            user=user  # Now includes organization_id
         )
     else:
         return LoginResponse(
@@ -86,7 +88,8 @@ async def create_user(request: CreateUserRequest):
         password=request.password,
         role=request.role,
         display_name=request.display_name,
-        email=request.email
+        email=request.email,
+        organization_id=request.organization_id  # NEW: Link to organization
     )
     
     if user:
@@ -97,7 +100,8 @@ async def create_user(request: CreateUserRequest):
                 "id": user.id,
                 "username": user.username,
                 "role": user.role,
-                "display_name": user.display_name
+                "display_name": user.display_name,
+                "organization_id": user.organization_id
             }
         }
     else:

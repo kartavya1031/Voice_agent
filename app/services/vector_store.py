@@ -18,8 +18,8 @@ from app.core.config import (
 )
 
 # Persist directory for ChromaDB
-# Changed to v3 to avoid sqlite schema conflicts with previous version
-PERSIST_DIR = Path(__file__).parent.parent / "data" / "chroma_db_v3"
+# Changed to v4 after multi-tenant refactoring to avoid sqlite schema conflicts
+PERSIST_DIR = Path(__file__).parent.parent / "data" / "chroma_db_v4"
 
 # Knowledge base files directory
 KB_FILES_DIR = Path(__file__).parent.parent / "data" / "knowledge_bases"
@@ -44,7 +44,11 @@ DEFAULT_COLLECTION_NAME = "anvenssa_knowledge"
 
 
 def _check_and_clean_chromadb():
-    """Check ChromaDB schema compatibility and clean if needed BEFORE creating client"""
+    """Check ChromaDB schema compatibility and clean if needed BEFORE creating client
+    
+    NOTE: Checks database accessibility and schema compatibility.
+    If the schema is incompatible (e.g., missing 'topic' column), clean the database.
+    """
     import shutil
     import sqlite3
     
@@ -55,25 +59,42 @@ def _check_and_clean_chromadb():
         return
     
     try:
-        # Directly connect to SQLite to check schema (without ChromaDB locking it)
+        # Directly connect to SQLite to verify database is accessible
         conn = sqlite3.connect(str(db_path))
         cursor = conn.cursor()
         
-        # Check if 'collections' table has the expected schema
-        # Try to select from collections table with the 'topic' column that new ChromaDB expects
+        # Check if collections table exists and has required columns
         try:
-            cursor.execute("SELECT topic FROM collections LIMIT 1")
-        except sqlite3.OperationalError as e:
-            if "no such column" in str(e):
-                print(f"⚠️ ChromaDB schema mismatch detected: {e}")
-                print(f"🔄 Cleaning incompatible database before startup...")
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='collections'")
+            result = cursor.fetchone()
+            if result is None:
+                print(f"⚠️ ChromaDB database exists but has no collections table")
+                print(f"🔄 Cleaning database for fresh start...")
                 conn.close()
-                # Delete the entire chroma_db directory
                 if PERSIST_DIR.exists():
                     shutil.rmtree(PERSIST_DIR)
                 print(f"✅ Old database cleaned. Fresh database will be created.")
                 return
-            raise
+            
+            # Check for 'topic' column which is required in newer chromadb versions
+            cursor.execute("PRAGMA table_info(collections)")
+            columns = [col[1] for col in cursor.fetchall()]
+            if 'topic' not in columns:
+                print(f"⚠️ ChromaDB database schema mismatch (missing 'topic' column)")
+                print(f"🔄 Cleaning database for fresh start...")
+                conn.close()
+                if PERSIST_DIR.exists():
+                    shutil.rmtree(PERSIST_DIR)
+                print(f"✅ Old database cleaned. Fresh database will be created.")
+                return
+                
+        except sqlite3.OperationalError as e:
+            print(f"⚠️ ChromaDB database check failed: {e}")
+            conn.close()
+            if PERSIST_DIR.exists():
+                shutil.rmtree(PERSIST_DIR)
+            print(f"✅ Database cleaned.")
+            return
         
         conn.close()
     except sqlite3.OperationalError as e:
@@ -597,6 +618,95 @@ def get_active_kb_info() -> dict:
         "collection_name": active_collection.name if active_collection else None,
         "chunk_count": active_collection.count() if active_collection else 0
     }
+
+
+# =============================================================================
+# MULTI-TENANT SEARCH FUNCTIONS
+# These functions accept explicit KB ID instead of using global active_collection
+# =============================================================================
+
+def search_knowledge_by_id(query: str, kb_id: str, n_results: int = 2) -> list[str]:
+    """Search a specific knowledge base for relevant context.
+    
+    MULTI-TENANT VERSION: Queries a specific KB by ID, not the global active one.
+    
+    Args:
+        query: Search query
+        kb_id: Knowledge base ID (ChromaDB collection: kb_{kb_id})
+        n_results: Number of results to return
+    
+    Returns:
+        List of relevant document chunks
+    """
+    try:
+        # Get the collection for this specific KB
+        collection_name = f"kb_{kb_id}"
+        target_collection = client.get_collection(
+            name=collection_name,
+            embedding_function=embedding_fn
+        )
+        
+        print(f"   🔍 Searching KB by ID: {kb_id} (collection: {collection_name})")
+        print(f"   📊 Collection has {target_collection.count()} chunks")
+        
+        if target_collection.count() == 0:
+            print(f"   ⚠️ KB collection is empty")
+            return []
+        
+        # Fetch more candidates for reranking (3x requested)
+        fetch_count = min(n_results * 3, target_collection.count())
+        
+        results = target_collection.query(
+            query_texts=[query],
+            n_results=fetch_count,
+            include=["documents", "distances"]
+        )
+        
+        result_docs = []
+        if results and results['documents'] and results['documents'][0]:
+            docs = results['documents'][0]
+            distances = results.get('distances', [[0] * len(docs)])[0]
+            
+            # Rerank using hybrid scoring
+            reranked = _rerank_results(query, docs, distances)
+            
+            # Take top n_results
+            result_docs = [doc for doc, score in reranked[:n_results]]
+            
+            if reranked:
+                print(f"   🎯 Reranked: top score={reranked[0][1]:.3f}")
+        
+        print(f"   📝 Found {len(result_docs)} relevant chunks")
+        return result_docs
+        
+    except Exception as e:
+        print(f"   ❌ Error searching KB {kb_id}: {e}")
+        return []
+
+
+def get_kb_info_by_id(kb_id: str) -> dict:
+    """Get info about a specific knowledge base by ID.
+    
+    Args:
+        kb_id: Knowledge base ID
+    
+    Returns:
+        Dict with collection info or empty dict if not found
+    """
+    try:
+        collection_name = f"kb_{kb_id}"
+        target_collection = client.get_collection(
+            name=collection_name,
+            embedding_function=embedding_fn
+        )
+        return {
+            "kb_id": kb_id,
+            "collection_name": collection_name,
+            "chunk_count": target_collection.count()
+        }
+    except Exception as e:
+        print(f"   ⚠️ KB {kb_id} not found: {e}")
+        return {}
 
 
 # Load knowledge base on module import

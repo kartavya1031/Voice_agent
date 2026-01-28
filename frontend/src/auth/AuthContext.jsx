@@ -40,6 +40,7 @@ export function AuthProvider({ children }) {
                     role: data.user.role,
                     displayName: data.user.display_name || data.user.username,
                     email: data.user.email,
+                    organizationId: data.user.organization_id,  // NEW: For multi-tenant filtering
                     loginTime: new Date().toISOString()
                 };
 

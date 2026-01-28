@@ -137,9 +137,23 @@ import threading
 threading.Thread(target=_warmup_llm_connection, daemon=True).start()
 
 
+# Override system prompt for multi-tenant browser calls
+_override_system_prompt: str = None
+
+
 def get_system_prompt() -> str:
     """Get the current system prompt from config with variables substituted"""
+    global _override_system_prompt
+    if _override_system_prompt:
+        return _override_system_prompt
     return agent_config_service.get_resolved_system_prompt()
+
+
+def set_system_prompt(prompt: str):
+    """Set an override system prompt for the current call (multi-tenant support)"""
+    global _override_system_prompt
+    _override_system_prompt = prompt
+    print(f"   📝 System prompt override set ({len(prompt)} chars)")
 
 
 # Keywords that should skip RAG lookup (fast path) - only greetings, not questions
@@ -213,6 +227,9 @@ def should_skip_rag(query: str) -> bool:
 def build_prompt_with_context(user_query: str, context: str = "", include_history: bool = True) -> list[dict]:
     """Build messages with optional RAG context and conversation history.
     
+    LEGACY FUNCTION: Uses global conversation manager and agent_config_service.
+    For multi-tenant calls, use build_prompt_for_agent() instead.
+    
     Args:
         user_query: The current user message
         context: RAG context (if any)
@@ -222,6 +239,43 @@ def build_prompt_with_context(user_query: str, context: str = "", include_histor
         List of messages for the LLM
     """
     system_prompt = get_system_prompt()
+    
+    # Get conversation history from global manager
+    history = []
+    if include_history:
+        manager = get_conversation_manager()
+        history = manager.get_messages()
+    
+    return build_prompt_for_agent(
+        user_query=user_query,
+        system_prompt=system_prompt,
+        history=history,
+        context=context
+    )
+
+
+def build_prompt_for_agent(
+    user_query: str,
+    system_prompt: str,
+    history: List[Dict[str, str]] = None,
+    context: str = ""
+) -> list[dict]:
+    """Build messages for a specific agent configuration.
+    
+    MULTI-TENANT VERSION: Accepts explicit parameters instead of using globals.
+    Use this for per-agent call handling.
+    
+    Args:
+        user_query: The current user message
+        system_prompt: Agent-specific system prompt (already resolved with variables)
+        history: Conversation history for this specific call
+        context: RAG context (if any)
+    
+    Returns:
+        List of messages for the LLM
+    """
+    if history is None:
+        history = []
     
     # CRITICAL: Voice agent behavior instructions
     # Follow the system prompt EXACTLY - it defines all behavior, responses, and edge cases
@@ -254,11 +308,8 @@ STRICT KNOWLEDGE BASE RULES - VERY IMPORTANT:
     messages = [{"role": "system", "content": system_content}]
     
     # Add conversation history for multi-turn conversations
-    if include_history:
-        manager = get_conversation_manager()
-        history = manager.get_messages()
-        if history:
-            messages.extend(history)
+    if history:
+        messages.extend(history)
     
     # Add current user message
     messages.append({"role": "user", "content": user_query})
@@ -389,6 +440,9 @@ def ask_ai_streaming_parallel(text: str):
 def ask_ai_streaming(text: str):
     """
     Stream LLM response - follows the dynamic system prompt strictly.
+    
+    LEGACY FUNCTION: Uses global state from agent_config_service.
+    For multi-tenant calls, use ask_ai_streaming_for_agent() instead.
     """
     start_time = time.time()
     
@@ -417,3 +471,120 @@ def ask_ai_streaming(text: str):
             return
         yield from ask_ai_streaming_parallel(text)
 
+
+# =============================================================================
+# MULTI-TENANT LLM FUNCTIONS
+# These functions accept explicit agent configuration instead of using globals
+# =============================================================================
+
+def get_context_for_agent(query: str, kb_id: Optional[str]) -> str:
+    """Get RAG context for a specific agent's knowledge base.
+    
+    Args:
+        query: User query to search for
+        kb_id: Agent's active knowledge base ID (ChromaDB collection)
+    
+    Returns:
+        Context string from knowledge base, or empty string if no KB/no match
+    """
+    if not kb_id:
+        return ""
+    
+    try:
+        from app.services.vector_store import search_knowledge_by_id
+        results = search_knowledge_by_id(query, kb_id, n_results=2)
+        if results:
+            return "\n\n".join(results)
+    except Exception as e:
+        print(f"   ⚠️ RAG error for KB {kb_id}: {e}")
+    
+    return ""
+
+
+def ask_ai_streaming_for_agent(
+    text: str,
+    system_prompt: str,
+    history: List[Dict[str, str]],
+    kb_id: Optional[str] = None,
+    max_tokens: int = 300
+) -> Generator[str, None, None]:
+    """
+    Stream LLM response for a specific agent configuration.
+    
+    MULTI-TENANT VERSION: Uses explicit parameters instead of global state.
+    
+    Args:
+        text: User's current message
+        system_prompt: Agent's system prompt (already resolved with variables)
+        history: Conversation history for this call
+        kb_id: Agent's active knowledge base ID for RAG
+        max_tokens: Maximum tokens for response
+    
+    Yields:
+        Tokens from the LLM response stream
+    """
+    import time
+    start_time = time.time()
+    
+    # Special handling for agent-first opening message
+    if text == "START_CONVERSATION":
+        text = "Begin the conversation with your opening script. Say only the opening greeting - do not continue beyond asking if you are speaking to the right person."
+    
+    context = ""
+    
+    if not should_skip_rag(text) and kb_id:
+        # Try RAG - get context from agent's knowledge base
+        print(f"   🔍 Searching agent KB: {kb_id}")
+        
+        rag_result = [None]
+        rag_done = threading.Event()
+        
+        def fetch_rag():
+            rag_start = time.time()
+            try:
+                rag_result[0] = get_context_for_agent(text, kb_id)
+                rag_time = (time.time() - rag_start) * 1000
+                if rag_result[0]:
+                    print(f"   📚 RAG found context ({rag_time:.0f}ms): {rag_result[0][:100]}...")
+                else:
+                    print(f"   📭 No relevant context found in agent KB ({rag_time:.0f}ms)")
+            except Exception as e:
+                print(f"   ⚠️ RAG error: {e}")
+                rag_result[0] = ""
+            finally:
+                rag_done.set()
+        
+        threading.Thread(target=fetch_rag, daemon=True).start()
+        rag_done.wait(timeout=3.0)  # Wait max 3 seconds for RAG
+        
+        if rag_done.is_set() and rag_result[0]:
+            context = rag_result[0]
+            print(f"   ✅ Using RAG context: {len(context)} chars")
+        elif not rag_done.is_set():
+            print(f"   ⏰ RAG timeout - proceeding without context")
+    elif should_skip_rag(text):
+        print(f"   ⏩ Skipping RAG (simple query)")
+    
+    # Build messages using agent-specific configuration
+    messages = build_prompt_for_agent(
+        user_query=text,
+        system_prompt=system_prompt,
+        history=history,
+        context=context
+    )
+    
+    # Stream LLM response
+    response = client.chat.completions.create(
+        model=DEPLOYMENT_NAME,
+        messages=messages,
+        max_tokens=max_tokens,
+        temperature=0.1,
+        top_p=0.9,
+        stream=True
+    )
+    
+    for chunk in response:
+        if chunk.choices and len(chunk.choices) > 0:
+            delta = chunk.choices[0].delta
+            if delta and delta.content:
+                yield delta.content

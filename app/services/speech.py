@@ -449,3 +449,167 @@ def initialize_speech_services():
     
     elapsed = (time.time() - start_time) * 1000
     print(f"🔊 Speech services initialized in {elapsed:.0f}ms")
+
+
+# =============================================================================
+# MULTI-TENANT SPEECH FUNCTIONS
+# These functions accept explicit voice/language parameters instead of globals
+# =============================================================================
+
+def _get_speech_config_for_agent(recognition_language: str, synthesis_voice: str):
+    """Create a speech config with agent-specific settings."""
+    config = speechsdk.SpeechConfig(
+        subscription=SPEECH_KEY,
+        region=SPEECH_REGION
+    )
+    config.speech_recognition_language = recognition_language
+    config.speech_synthesis_voice_name = synthesis_voice
+    config.set_property(
+        speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs,
+        "400"
+    )
+    config.set_property(
+        speechsdk.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs,
+        "400"
+    )
+    return config
+
+
+def create_streaming_recognizer_for_agent(
+    recognition_language: str,
+    on_text_callback,
+    on_barge_in_callback=None,
+    sample_rate=16000
+):
+    """
+    Create Azure streaming STT recognizer for a specific agent.
+    
+    MULTI-TENANT VERSION: Accepts explicit language parameter.
+    
+    Args:
+        recognition_language: Agent's recognition language (e.g., 'en-IN', 'hi-IN')
+        on_text_callback: Callback when speech is recognized
+        on_barge_in_callback: Callback when partial speech detected (barge-in)
+        sample_rate: Audio sample rate (default 16kHz)
+    
+    Returns:
+        (recognizer, push_stream) tuple
+    """
+    import time
+    config = speechsdk.SpeechConfig(
+        subscription=SPEECH_KEY,
+        region=SPEECH_REGION
+    )
+    config.speech_recognition_language = recognition_language
+    config.set_property(
+        speechsdk.PropertyId.Speech_SegmentationSilenceTimeoutMs,
+        "400"
+    )
+    config.set_property(
+        speechsdk.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs,
+        "400"
+    )
+    
+    # Define audio format
+    audio_format = speechsdk.audio.AudioStreamFormat(
+        samples_per_second=sample_rate,
+        bits_per_sample=16,
+        channels=1
+    )
+    push_stream = speechsdk.audio.PushAudioInputStream(stream_format=audio_format)
+    audio_config = speechsdk.audio.AudioConfig(stream=push_stream)
+    recognizer = speechsdk.SpeechRecognizer(
+        speech_config=config,
+        audio_config=audio_config
+    )
+    
+    # Barge-in state tracking
+    last_barge_in_time = [0]
+    barge_in_debounce_ms = 300
+    min_barge_in_words = 1
+    
+    def recognized(evt):
+        if evt.result.reason == speechsdk.ResultReason.RecognizedSpeech:
+            on_text_callback(evt.result.text)
+    
+    def recognizing(evt):
+        text = evt.result.text
+        if on_barge_in_callback and text:
+            words = text.strip().split()
+            if len(words) >= min_barge_in_words:
+                current_time = time.time() * 1000
+                if current_time - last_barge_in_time[0] > barge_in_debounce_ms:
+                    last_barge_in_time[0] = current_time
+                    print(f"   🎤 User speaking: \"{text[:30]}...\"")
+                    on_barge_in_callback()
+    
+    def canceled(evt):
+        print(f"❌ STT canceled: {evt.result.cancellation_details.reason}")
+    
+    recognizer.recognized.connect(recognized)
+    recognizer.recognizing.connect(recognizing)
+    recognizer.canceled.connect(canceled)
+    
+    recognizer.start_continuous_recognition()
+    return recognizer, push_stream
+
+
+def text_to_speech_telephony_for_agent(text: str, voice_name: str):
+    """
+    Synthesize audio for telephony using agent-specific voice.
+    
+    MULTI-TENANT VERSION: Accepts explicit voice parameter.
+    
+    Args:
+        text: Text to synthesize
+        voice_name: Agent's synthesis voice (e.g., 'en-IN-NeerjaNeural')
+    
+    Yields:
+        Audio chunks suitable for telephony streaming
+    """
+    import time
+    
+    # Truncate very long text
+    if len(text) > 120:
+        text = text[:117] + "..."
+    
+    # Build SSML with agent's voice
+    ssml = _build_ssml(text, voice_name)
+    start_time = time.time()
+    
+    # Create synthesizer with agent's voice (not global)
+    config = speechsdk.SpeechConfig(
+        subscription=SPEECH_KEY,
+        region=SPEECH_REGION
+    )
+    config.speech_synthesis_voice_name = voice_name
+    config.set_speech_synthesis_output_format(
+        speechsdk.SpeechSynthesisOutputFormat.Raw8Khz16BitMonoPcm
+    )
+    
+    synthesizer = speechsdk.SpeechSynthesizer(
+        speech_config=config,
+        audio_config=None
+    )
+    
+    result = synthesizer.speak_ssml_async(ssml).get()
+    
+    if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+        audio_data = result.audio_data
+        synthesis_time = (time.time() - start_time) * 1000
+        print(f"   📞 TTS (agent voice: {voice_name}): {len(audio_data)} bytes, {synthesis_time:.0f}ms")
+        
+        chunk_size = 8000  # 500ms of audio at 8kHz 16-bit
+        for i in range(0, len(audio_data), chunk_size):
+            yield audio_data[i:i + chunk_size]
+    else:
+        print(f"❌ Agent TTS failed: {result.reason}")
+        # Fallback: try without SSML
+        result = synthesizer.speak_text_async(text).get()
+        if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+            audio_data = result.audio_data
+            chunk_size = 8000
+            for i in range(0, len(audio_data), chunk_size):
+                yield audio_data[i:i + chunk_size]
+        else:
+            raise Exception(f"Agent TTS failed: {result.reason}")
