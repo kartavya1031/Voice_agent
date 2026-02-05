@@ -290,12 +290,11 @@ CRITICAL VOICE AGENT RULES:
 6. Check conversation history to know where you are in the script - do NOT repeat greetings.
 7. Handle edge cases EXACTLY as defined in the system prompt (wrong person, busy, etc.).
 
-STRICT KNOWLEDGE BASE RULES - VERY IMPORTANT:
-8. ONLY use information from the CONTEXT provided. Do NOT make up or guess numbers, rates, tenures, documents, or any other details.
-9. If the answer is NOT in the CONTEXT, say "Main abhi yeh information confirm nahi kar sakta, lekin aap humari team se baat kar sakte hain" or similar. NEVER invent information.
-10. Use EXACT numbers and details from the knowledge base - do not round, estimate, or modify them.
-11. If asked about interest rate, tenure, documents, banks, etc. - ONLY state what is written in the CONTEXT. If not present, admit you don't have that specific information.
-12. NEVER hallucinate or fabricate any factual information like percentages, years, bank names, or document lists.
+KNOWLEDGE BASE RULES:
+8. When CONTEXT is provided below, USE that information to answer the user's question helpfully and accurately.
+9. If specific details (like phone numbers, email, addresses) are in the CONTEXT, share them with the user.
+10. Keep responses conversational and natural - don't repeat "according to the context" etc.
+11. If the CONTEXT section is empty or doesn't contain relevant info, politely say you'll connect them with someone who can help.
 """
     
     # Build system message

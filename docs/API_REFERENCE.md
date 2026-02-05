@@ -1,264 +1,250 @@
-# API Documentation
+# API Reference & Integration Guide
+
+This document defines the API endpoints and WebSocket protocols for the AI Voice Agent platform.
+It is intended for frontend developers and third-party integrators who want to build custom interfaces or connect external services.
 
 ## Base URL
-- Development: `http://localhost:8000`
-- Production: `https://voice.anvenssa.com`
+- **Local Dev**: `http://localhost:8000`
+- **Production**: `https://your-domain.com`
 
 ---
 
-## Authentication
+## 1. Authentication
+
+The API uses simple session-based or token-based authentication (implementation dependent).
 
 ### Login
-```http
-POST /api/auth/login
-Content-Type: application/json
+**POST** `/api/auth/login`
 
+Authenticate a user and retrieve their session/token.
+
+**Request Body:**
+```json
 {
-    "username": "admin",
-    "password": "password123"
+  "username": "client_user",
+  "password": "secure_password"
 }
 ```
 
 **Response:**
 ```json
 {
-    "access_token": "eyJ...",
-    "token_type": "bearer",
-    "user": {
-        "id": "uuid",
-        "username": "admin",
-        "role": "super_admin",
-        "organization_id": "uuid"
-    }
+  "success": true,
+  "user": {
+    "id": "uuid...",
+    "username": "client_user",
+    "role": "client",
+    "organization_id": "org_uuid..."
+  }
 }
 ```
 
 ---
 
-## Agent Management
+## 2. Multi-Tenancy & Filtering
+
+**Crucial Logic**:
+- **Admin Users**: Can see all data. Do not need to pass `organization_id`.
+- **Client Users**: MUST pass `organization_id` query parameter for all list endpoints (`GET /api/agents`, `GET /api/calls`).
+- If a client user tries to access data without `organization_id` or with a wrong ID, the API will return filtered results or empty lists.
+
+---
+
+## 3. Agents API
+
+Manage AI Voice Agents.
 
 ### List Agents
-```http
-GET /api/agents
-Authorization: Bearer {token}
-```
+**GET** `/api/agents`
+
+**Query Parameters:**
+- `organization_id` (Optional): ID of the organization to filter by. Required for non-admin users.
 
 **Response:**
 ```json
 {
-    "agents": [
-        {
-            "id": "uuid",
-            "name": "Sales Agent",
-            "organization_id": "uuid",
-            "phone_number": "+91XXXXXXXXXX",
-            "recognition_language": "en-IN",
-            "synthesis_voice_name": "en-IN-NeerjaNeural",
-            "is_active": true
-        }
-    ]
-}
-```
-
-### Create Agent
-```http
-POST /api/agents
-Authorization: Bearer {token}
-Content-Type: application/json
-
-{
-    "organization_id": "uuid",
-    "name": "New Agent",
-    "system_prompt": "You are a helpful assistant...",
-    "recognition_language": "en-IN",
-    "synthesis_voice_name": "en-IN-NeerjaNeural"
+  "agents": [
+    {
+      "id": "agent_uuid...",
+      "name": "Sales Bot",
+      "phone_number": "+1234567890",
+      "synthesis_voice_name": "en-IN-NeerjaNeural",
+      "active_kb_id": "kb_uuid..."
+    }
+  ]
 }
 ```
 
 ### Get Agent Details
-```http
-GET /api/agents/{agent_id}
-Authorization: Bearer {token}
-```
+**GET** `/api/agents/{agent_id}`
 
-### Update Agent
-```http
-PUT /api/agents/{agent_id}
-Authorization: Bearer {token}
-Content-Type: application/json
+Retrieve full configuration for a single agent.
 
+### Create Agent
+**POST** `/api/agents`
+
+**Request Body:**
+```json
 {
-    "name": "Updated Name",
-    "system_prompt": "Updated prompt..."
+  "organization_id": "org_uuid...",
+  "name": "Support Bot",
+  "system_prompt": "You are a helpful support agent...",
+  "sentiment_analysis_prompt": "Analyze if user is satisfied...",
+  "synthesis_voice_name": "en-US-JennyNeural"
 }
 ```
 
-### Delete Agent
-```http
-DELETE /api/agents/{agent_id}
-Authorization: Bearer {token}
-```
-
 ---
 
-## Knowledge Base
+## 4. Calls API
 
-### Upload Knowledge Base
-```http
-POST /api/agents/{agent_id}/knowledge-base
-Authorization: Bearer {token}
-Content-Type: multipart/form-data
+Access call history, recordings, and transcripts.
 
-name: "Product FAQ"
-file: <file.pdf>
-```
+### List Calls (History)
+**GET** `/api/calls/history`
 
-### List Knowledge Bases
-```http
-GET /api/agents/{agent_id}/knowledge-bases
-Authorization: Bearer {token}
-```
-
-### Delete Knowledge Base
-```http
-DELETE /api/agents/{agent_id}/knowledge-base/{kb_id}
-Authorization: Bearer {token}
-```
-
----
-
-## Call Management
-
-### Get Call History
-```http
-GET /api/calls/history
-Authorization: Bearer {token}
-```
+**Query Parameters:**
+- `organization_id` (Optional): Filter by organization.
+- `user_id` (Optional): Filter by specific user who made the call.
 
 **Response:**
 ```json
 {
-    "calls": [
-        {
-            "id": "uuid",
-            "agent_id": "uuid",
-            "agent_name": "Sales Agent",
-            "from_number": "+91XXXXXXXXXX",
-            "to_number": "+91YYYYYYYYYY",
-            "duration_seconds": 120,
-            "status": "completed",
-            "recording_url": "https://...",
-            "created_at": "2026-01-28T10:00:00Z"
-        }
-    ],
-    "total": 1
+  "calls": [
+    {
+      "id": "call_uuid...",
+      "agent_id": "agent_uuid...",
+      "start_time": "2023-10-27T10:00:00Z",
+      "status": "completed",
+      "duration": 120,
+      "sentiment": "Interested",
+      "recording_url": "https://..."
+    }
+  ],
+  "total": 50
 }
 ```
 
 ### Get Call Details
-```http
-GET /api/calls/{call_id}
-Authorization: Bearer {token}
-```
+**GET** `/api/calls/{call_id}`
 
----
-
-## FreJun Telephony
-
-### Initiate Outbound Call
-```http
-POST /api/frejun/initiate-call
-Authorization: Bearer {token}
-Content-Type: application/json
-
-{
-    "to_number": "+91XXXXXXXXXX",
-    "agent_id": "uuid",
-    "record": true
-}
-```
-
-### Get FreJun Config
-```http
-GET /api/frejun/config
-Authorization: Bearer {token}
-```
-
----
-
-## Voice Settings
-
-### Get Supported Voices
-```http
-GET /api/agent/voices
-```
+Returns full details including transcript and sentiment analysis.
 
 **Response:**
 ```json
 {
-    "languages": [
-        {"code": "en-IN", "name": "English (India)"},
-        {"code": "hi-IN", "name": "Hindi (India)"}
-    ],
-    "voices": {
-        "en-IN": [
-            {"name": "en-IN-NeerjaNeural", "display": "Neerja (Female)"},
-            {"name": "en-IN-PrabhatNeural", "display": "Prabhat (Male)"}
-        ]
-    }
+  "id": "call_uuid...",
+  "transcript": [
+    { "speaker": "agent", "message": "Hello!" },
+    { "speaker": "user", "message": "Hi there." }
+  ],
+  "sentiment": "Interested",
+  "sentiment_details": "{...json analysis...}",
+  "recording_url": "https://..."
 }
 ```
 
-### Get Prompt Variables
-```http
-GET /api/agent/prompt-variables
-```
-
 ---
 
-## WebSocket Endpoints
+## 5. WebSocket API (Real-Time Voice Streaming)
 
-### Browser Audio WebSocket
-```
-ws://localhost:8000/ws/audio?agent_id={agent_id}
-```
+This is the core interface for the voice interaction. Any client (Web, Mobile, Telephony Provider) that wants to "talk" to the AI connects here.
 
-**Messages from client:**
-```json
-{"type": "audio", "data": "<base64_audio>"}
-{"type": "playback_complete"}
-{"type": "end_call"}
-```
+**Endpoint**: `ws://YOUR_DOMAIN/ws/audio`
 
-**Messages from server:**
-```json
-{"type": "audio_chunk", "data": "<base64_audio>", "first_chunk": true}
-{"type": "audio_end"}
-{"type": "transcript", "speaker": "user", "text": "Hello"}
-{"type": "call_ended", "reason": "user_intent"}
-```
+**Query Parameters:**
+- `agent_id` (Required): The ID of the agent configuration to load.
+- `call_id` (Optional): A unique ID for this call session.
 
-### FreJun Audio WebSocket
-```
-ws://localhost:8000/ws/frejun-audio?agent_id={agent_id}&call_id={call_id}
-```
+### Protocol Flow
 
----
+#### 1. Connection
+Client opens WebSocket connection to `/ws/audio?agent_id=...`.
+Server accepts and loads agent configuration (Voice, Knowledge Base, Prompts).
 
-## Error Responses
+#### 2. Client -> Server Messages
 
-All errors follow this format:
+**A. Start Stream (Optional metadata)**
 ```json
 {
-    "error": "Error message",
-    "detail": "Additional details if available"
+  "type": "start",
+  "stream_sid": "stream_123",
+  "call_sid": "call_123"
 }
 ```
 
-| HTTP Code | Meaning |
-|-----------|---------|
-| 400 | Bad Request - Invalid input |
-| 401 | Unauthorized - Missing/invalid token |
-| 403 | Forbidden - No permission |
-| 404 | Not Found - Resource doesn't exist |
-| 500 | Server Error - Internal error |
+**B. Audio Data (Continuously sent by client)**
+Raw audio chunks captured from microphone.
+```json
+{
+  "event": "media",
+  "media": {
+    "payload": "<BASE64_ENCODED_G711_ULAW_AUDIO>"
+  }
+}
+```
+*Note: Format is typically expected to be **G.711 u-law @ 8000Hz** (standard telephony) or **PCM 16-bit @ 24kHz** depending on server config.*
+
+**C. Stop/Close**
+```json
+{
+  "type": "stop"
+}
+```
+
+#### 3. Server -> Client Messages
+
+**A. Audio Response (AI Speaking)**
+The server streams back generated audio chunks.
+```json
+{
+  "event": "media",
+  "media": {
+    "payload": "<BASE64_ENCODED_AUDIO_CHUNK>"
+  }
+}
+```
+*Client should decode and play these chunks immediately.*
+
+**B. Clear Buffer (Barge-In)**
+Sent when the user interrupts the AI. The client MUST immediately stop playing any buffered audio.
+```json
+{
+  "event": "clear"
+}
+```
+
+**C. Mark (End of Turn)**
+Sent when AI finishes a sentence/turn.
+```json
+{
+  "event": "mark",
+  "mark": { "name": "end_of_response" }
+}
+```
+
+---
+
+## 6. Webhooks (Integration with Telephony Providers)
+
+If you are using FreJun or Twilio, configure these Webhooks in their dashboard.
+
+**Unified Webhook URL**: `POST /api/webhooks/frejun`
+
+This single endpoint handles:
+1.  **Incoming Call**: `call.initiated`
+2.  **Call Status**: `call.ringing`, `call.answered`, `call.completed`
+3.  **Recording Ready**: `recording.completed` (Triggers DB update)
+
+**Payload Example (FreJun style):**
+```json
+{
+  "event": "call.completed",
+  "data": {
+    "call_id": "...",
+    "duration": 45,
+    "recording_url": "https://..."
+  }
+}
+```
+*Note: The server automatically triggers Sentiment Analysis upon receiving the `call.completed` webhook.*

@@ -23,14 +23,16 @@ class CallService:
         from_number: Optional[str] = None,
         to_number: Optional[str] = None,
         user_id: Optional[str] = None,
-        agent_id: Optional[str] = None  # NEW: Link to handling agent
+        agent_id: Optional[str] = None,
+        campaign_id: Optional[str] = None  # NEW: Link to bulk campaign
     ) -> Call:
         """Create a new call record"""
         db = SessionLocal()
         try:
             call = Call(
-                agent_id=agent_id,  # NEW
+                agent_id=agent_id,
                 user_id=user_id,
+                campaign_id=campaign_id,  # NEW: For bulk calling
                 call_provider=call_provider,
                 provider_call_id=provider_call_id,
                 from_number=from_number,
@@ -40,7 +42,7 @@ class CallService:
             db.add(call)
             db.commit()
             db.refresh(call)
-            print(f"📞 Call created in DB: {call.id}" + (f" (Agent: {agent_id})" if agent_id else ""))
+            print(f"📞 Call created in DB: {call.id}" + (f" (Agent: {agent_id})" if agent_id else "") + (f" (Campaign: {campaign_id})" if campaign_id else ""))
             return call
         except Exception as e:
             db.rollback()
@@ -288,12 +290,14 @@ class CallService:
             db.close()
     
     @staticmethod
-    def get_calls_with_details(limit: int = 50, organization_id: Optional[str] = None) -> List[dict]:
+    def get_calls_with_details(limit: int = 50, organization_id: Optional[str] = None, user_id: Optional[str] = None) -> List[dict]:
         """
         Get recent calls with all details including recording URLs.
         
-        MULTI-TENANT: If organization_id is provided, only returns calls for agents
-        belonging to that organization.
+        MULTI-TENANT: 
+        - If organization_id is provided, only returns calls for agents belonging to that organization.
+        - If user_id is provided, only returns calls initiated by that user.
+        - Both can be combined for stricter filtering.
         """
         db = SessionLocal()
         try:
@@ -313,6 +317,10 @@ class CallService:
                     # No agents in org = no calls to return
                     return []
             
+            # Filter by user_id if provided (user who initiated the call)
+            if user_id:
+                query = query.filter(Call.user_id == user_id)
+            
             calls = query.order_by(Call.created_at.desc()).limit(limit).all()
             result = []
             for call in calls:
@@ -327,10 +335,18 @@ class CallService:
                 if call.agent:
                     agent_name = call.agent.name
                 
+                # Get user name if available (for admin view - shows who initiated)
+                user_name = None
+                if call.user:
+                    user_name = call.user.display_name or call.user.username
+                
                 result.append({
                     "id": call.id,
                     "agent_id": call.agent_id,
-                    "agent_name": agent_name,  # NEW: Include agent name
+                    "agent_name": agent_name,
+                    "user_id": call.user_id,  # Who initiated the call
+                    "user_name": user_name,   # Display name for admin view (Initiated By)
+                    "campaign_id": call.campaign_id,  # Link to campaign if bulk call
                     "provider_call_id": call.provider_call_id,
                     "from_number": call.from_number,
                     "to_number": call.to_number,
@@ -343,6 +359,8 @@ class CallService:
                     "recording_id": call.recording_id,
                     "stream_id": call.stream_id,
                     "has_transcript": transcript is not None,
+                    "sentiment": call.sentiment,  # Sentiment analysis result
+                    "sentiment_details": call.sentiment_details,  # Full sentiment analysis JSON
                     "created_at": call.created_at.isoformat() if call.created_at else None
                 })
             return result
@@ -708,7 +726,8 @@ Ask clarifying questions when needed."""
         synthesis_voice_name: str = "en-IN-NeerjaNeural",
         max_call_duration: int = 600,
         max_silence_duration: int = 20,
-        description: Optional[str] = None
+        description: Optional[str] = None,
+        sentiment_analysis_prompt: Optional[str] = None
     ) -> Optional[Agent]:
         """Create a new agent for an organization"""
         db = SessionLocal()
@@ -736,6 +755,7 @@ Ask clarifying questions when needed."""
                 description=description,
                 phone_number=phone_number,
                 system_prompt=system_prompt or AgentService.DEFAULT_SYSTEM_PROMPT,
+                sentiment_analysis_prompt=sentiment_analysis_prompt,
                 recognition_language=recognition_language,
                 synthesis_voice_name=synthesis_voice_name,
                 max_call_duration=max_call_duration,
@@ -839,6 +859,7 @@ Ask clarifying questions when needed."""
         phone_number: Optional[str] = None,
         system_prompt: Optional[str] = None,
         prompt_variables: Optional[str] = None,
+        sentiment_analysis_prompt: Optional[str] = None,
         recognition_language: Optional[str] = None,
         synthesis_voice_name: Optional[str] = None,
         max_call_duration: Optional[int] = None,
@@ -873,6 +894,7 @@ Ask clarifying questions when needed."""
             if description is not None: agent.description = description
             if system_prompt is not None: agent.system_prompt = system_prompt
             if prompt_variables is not None: agent.prompt_variables = prompt_variables
+            if sentiment_analysis_prompt is not None: agent.sentiment_analysis_prompt = sentiment_analysis_prompt
             if recognition_language is not None: agent.recognition_language = recognition_language
             if synthesis_voice_name is not None: agent.synthesis_voice_name = synthesis_voice_name
             if max_call_duration is not None: agent.max_call_duration = max_call_duration

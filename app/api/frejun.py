@@ -197,6 +197,127 @@ async def initiate_call(request: InitiateCallRequest, req: Request):
         )
 
 
+async def initiate_campaign_call(
+    to_number: str,
+    agent_id: str,
+    user_id: str,
+    campaign_id: str,
+    variables: dict = None
+) -> dict:
+    """
+    Initiate a call as part of a bulk calling campaign.
+    
+    This function:
+    1. Calls FreJun API to initiate the call
+    2. Creates a Call record linked to the campaign, agent, and user
+    3. Applies the agent's prompt variables from the CSV data
+    
+    Returns dict with success status and call_id
+    """
+    if not FREJUN_API_KEY:
+        return {"success": False, "error": "FreJun API key not configured"}
+    
+    if not FREJUN_FROM_NUMBER:
+        return {"success": False, "error": "FreJun from number not configured"}
+    
+    # Format phone number
+    formatted_number = to_number.strip()
+    if not formatted_number.startswith("+"):
+        if formatted_number.startswith("91"):
+            formatted_number = "+" + formatted_number
+        else:
+            formatted_number = "+91" + formatted_number.lstrip("0")
+    
+    # Generate call ID
+    import uuid
+    call_id = str(uuid.uuid4())[:8]
+    
+    # Get base URL for flow
+    base_url = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000")
+    flow_url = f"{base_url}/api/frejun/flow/{call_id}"
+    status_callback_url = f"{base_url}/api/frejun/webhook"
+    
+    # Store agent and variables info for when the call connects
+    active_calls[call_id] = {
+        "to_number": formatted_number,
+        "from_number": FREJUN_FROM_NUMBER,
+        "agent_id": agent_id,
+        "user_id": user_id,
+        "campaign_id": campaign_id,
+        "variables": variables or {},
+        "status": "initiated",
+        "started_at": datetime.now().isoformat()
+    }
+    
+    frejun_payload = {
+        "from_number": FREJUN_FROM_NUMBER,
+        "to_number": formatted_number,
+        "flow_url": flow_url,
+        "status_callback_url": status_callback_url,
+        "record": True
+    }
+    
+    print(f"📞 Campaign call: {FREJUN_FROM_NUMBER} → {formatted_number}")
+    print(f"   Agent: {agent_id}, Campaign: {campaign_id}")
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                FREJUN_API_URL,
+                json=frejun_payload,
+                headers={
+                    "x-api-key": FREJUN_API_KEY,
+                    "Content-Type": "application/json"
+                },
+                timeout=30.0
+            )
+            
+            if response.status_code == 202:
+                response_data = response.json() if response.text else {}
+                frejun_call_id = response_data.get("call_id", call_id)
+                
+                # Update active call with FreJun ID
+                active_calls[call_id]["frejun_call_id"] = frejun_call_id
+                if frejun_call_id != call_id:
+                    active_calls[frejun_call_id] = active_calls[call_id]
+                
+                # Save call to database with campaign link
+                from app.db.service import call_service
+                try:
+                    call_record = call_service.create_call(
+                        call_provider="frejun",
+                        provider_call_id=frejun_call_id,
+                        from_number=FREJUN_FROM_NUMBER,
+                        to_number=formatted_number,
+                        agent_id=agent_id,
+                        user_id=user_id,
+                        campaign_id=campaign_id
+                    )
+                    print(f"   💾 Call saved: {call_record.id}")
+                    
+                    return {
+                        "success": True,
+                        "call_id": call_record.id,
+                        "frejun_call_id": frejun_call_id
+                    }
+                except Exception as db_error:
+                    print(f"   ⚠️ DB error: {db_error}")
+                    return {
+                        "success": True,  # Call initiated but not saved
+                        "call_id": call_id,
+                        "frejun_call_id": frejun_call_id,
+                        "warning": str(db_error)
+                    }
+            else:
+                error_msg = f"FreJun API error: {response.status_code}"
+                print(f"   ❌ {error_msg}")
+                return {"success": False, "error": error_msg}
+                
+    except httpx.TimeoutException:
+        return {"success": False, "error": "FreJun API timeout"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 @router.api_route("/flow/{call_id}", methods=["GET", "POST"])
 async def get_call_flow(call_id: str, req: Request):
     """
@@ -374,6 +495,18 @@ async def frejun_webhook(request: Request):
                     if event == "call.completed":
                         duration = data.get("duration", 0)
                         call_service.end_call(call_id, "completed", duration)
+                        
+                        # Trigger sentiment analysis for completed calls
+                        try:
+                            transcript_content = call_service.get_call_transcript(call_id)
+                            if transcript_content:
+                                from app.services.sentiment_analysis import analyze_and_save_sentiment
+                                call = call_service.get_call_by_provider_id(call_id)
+                                agent_id = call.agent_id if call else None
+                                print(f"   🎯 Running sentiment analysis for call {call_id}...")
+                                analyze_and_save_sentiment(call_id if not call else call.id, transcript_content, agent_id)
+                        except Exception as sentiment_error:
+                            print(f"   ⚠️ Sentiment analysis failed: {sentiment_error}")
                 
                 # Handle stream events
                 elif event.startswith("stream."):

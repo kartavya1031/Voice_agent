@@ -29,6 +29,7 @@ from app.services.speech import (
     text_to_speech,
     text_to_speech_streaming,
     text_to_speech_telephony,
+    text_to_speech_telephony_for_agent,
     create_streaming_recognizer,
     update_speech_settings,
     get_current_speech_settings
@@ -46,7 +47,8 @@ from app.db.service import call_service
 from app.api.frejun import router as frejun_router
 from app.api.webhooks import router as webhooks_router
 from app.api.auth import router as auth_router
-from app.api.agents import router as agents_router  # NEW: Multi-tenant agent management
+from app.api.agents import router as agents_router
+from app.api.campaigns import router as campaigns_router  # NEW: Bulk calling campaigns
 
 app = FastAPI(title="Anvenssa Voice Agent API")
 
@@ -54,7 +56,8 @@ app = FastAPI(title="Anvenssa Voice Agent API")
 app.include_router(frejun_router)
 app.include_router(webhooks_router)
 app.include_router(auth_router)
-app.include_router(agents_router)  # NEW
+app.include_router(agents_router)
+app.include_router(campaigns_router)  # NEW: Bulk calling
 
 # CORS for React frontend
 app.add_middleware(
@@ -192,15 +195,17 @@ def list_calls():
 
 
 @app.get("/api/calls/history")
-def get_call_history(organization_id: Optional[str] = None):
+def get_call_history(organization_id: Optional[str] = None, user_id: Optional[str] = None):
     """
     Get call history with full details including recordings and transcripts.
     
-    MULTI-TENANT: If organization_id is provided, only returns calls for agents
-    belonging to that organization.
+    MULTI-TENANT: 
+    - If organization_id is provided, only returns calls for agents belonging to that organization.
+    - If user_id is provided, only returns calls initiated by that user.
+    - Both can be combined for stricter filtering.
     """
     try:
-        calls = call_service.get_calls_with_details(limit=50, organization_id=organization_id)
+        calls = call_service.get_calls_with_details(limit=50, organization_id=organization_id, user_id=user_id)
         return {"calls": calls, "total": len(calls)}
     except Exception as e:
         return {"error": str(e), "calls": [], "total": 0}
@@ -229,10 +234,42 @@ def get_call(call_id: str):
             "end_reason": call.end_reason,
             "recording_url": getattr(call, 'recording_url', None),
             "recording_id": getattr(call, 'recording_id', None),
+            "sentiment": getattr(call, 'sentiment', None),
+            "sentiment_details": getattr(call, 'sentiment_details', None),
             "transcript": transcript_content
         }
     except Exception as e:
         return {"error": str(e)}
+
+
+@app.post("/api/calls/{call_id}/analyze-sentiment")
+def analyze_call_sentiment_endpoint(call_id: str):
+    """
+    Manually trigger sentiment analysis for a specific call.
+    Useful for re-analyzing calls or analyzing calls that were made before sentiment was enabled.
+    """
+    try:
+        # Get call and transcript
+        call = call_service.get_call(call_id)
+        if not call:
+            return {"error": "Call not found"}
+        
+        transcript_content = call_service.get_call_transcript(call_id)
+        if not transcript_content:
+            return {"error": "No transcript found for this call"}
+        
+        # Run sentiment analysis
+        from app.services.sentiment_analysis import analyze_and_save_sentiment
+        result = analyze_and_save_sentiment(call_id, transcript_content, call.agent_id)
+        
+        return {
+            "success": True,
+            "call_id": call_id,
+            "sentiment": result.get("sentiment"),
+            "details": result
+        }
+    except Exception as e:
+        return {"error": str(e), "success": False}
 
 
 @app.get("/api/calls/{call_id}/recording")
@@ -688,8 +725,8 @@ Your response (END or CONTINUE):"""
         return False
 
 
-def save_transcript(transcript: list, call_duration: float, call_id: str = None, end_reason: str = None):
-    """Save call transcript to database only"""
+def save_transcript(transcript: list, call_duration: float, call_id: str = None, end_reason: str = None, agent_id: str = None):
+    """Save call transcript to database and trigger sentiment analysis"""
     
     # Format transcript content
     content = []
@@ -731,6 +768,23 @@ def save_transcript(transcript: list, call_duration: float, call_id: str = None,
             )
             
             print(f"💾 Transcript saved to database: {call_id}")
+            
+            # Trigger sentiment analysis in background
+            # Get agent_id from call if not provided
+            if not agent_id:
+                call = call_service.get_call(call_id)
+                if call:
+                    agent_id = call.agent_id
+            
+            # Run sentiment analysis if we have a transcript with content
+            if transcript_content and len(transcript) > 0:
+                try:
+                    from app.services.sentiment_analysis import analyze_and_save_sentiment
+                    print(f"🎯 Starting sentiment analysis for call {call_id}...")
+                    analyze_and_save_sentiment(call_id, transcript_content, agent_id)
+                except Exception as e:
+                    print(f"⚠️ Sentiment analysis failed: {e}")
+            
         except Exception as e:
             print(f"⚠️ Could not save to database: {e}")
     else:
@@ -745,20 +799,23 @@ def health():
 
 
 @app.websocket("/ws/audio")
-async def audio_ws(ws: WebSocket, agent_id: str = None):
+async def audio_ws(ws: WebSocket, agent_id: str = None, user_id: str = None):
     """
     Browser-based audio WebSocket.
     
-    MULTI-TENANT: Accepts agent_id query parameter to load agent-specific config.
-    If no agent_id is provided, uses global/default settings.
+    MULTI-TENANT: Accepts agent_id and user_id query parameters.
+    - agent_id: Load agent-specific config (prompt, voice, KB)
+    - user_id: Track which user initiated the call
     """
     global current_turn_id
     
     # =========================================================================
-    # MULTI-TENANT: Parse agent_id from query string and load configuration
+    # MULTI-TENANT: Parse parameters from query string
     # =========================================================================
     if agent_id is None:
         agent_id = ws.query_params.get("agent_id")
+    if user_id is None:
+        user_id = ws.query_params.get("user_id")
     
     # Agent-specific configuration (defaults to global settings)
     agent_config = {
@@ -816,10 +873,11 @@ async def audio_ws(ws: WebSocket, agent_id: str = None):
     try:
         call_record = call_service.create_call(
             call_provider="websocket",
-            agent_id=agent_id  # Link call to specific agent
+            agent_id=agent_id,  # Link call to specific agent
+            user_id=user_id  # Link call to user who initiated
         )
         call_id = call_record.id
-        print(f"📞 Browser call started with ID: {call_id}, Agent: {agent_config['agent_name']}")
+        print(f"📞 Browser call started with ID: {call_id}, Agent: {agent_config['agent_name']}, User: {user_id}")
         
         # MULTI-TENANT: Update global settings for this call based on agent config
         # This ensures the existing LLM and TTS functions use agent-specific settings
@@ -1501,7 +1559,6 @@ async def frejun_audio_ws(ws: WebSocket):
             })
             
             # MULTI-TENANT: Use agent-specific voice
-            from app.services.speech import text_to_speech_telephony_for_agent
             for audio_chunk in text_to_speech_telephony_for_agent(goodbye_msg, agent_config["synthesis_voice"]):
                 await send_audio_to_frejun(audio_chunk)
             

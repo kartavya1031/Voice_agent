@@ -29,6 +29,7 @@ class CreateAgentRequest(BaseModel):
     description: Optional[str] = None
     phone_number: Optional[str] = None
     system_prompt: Optional[str] = None
+    sentiment_analysis_prompt: Optional[str] = None  # Custom conditions for call sentiment analysis
     recognition_language: str = "en-IN"
     synthesis_voice_name: str = "en-IN-NeerjaNeural"
     max_call_duration: int = 600
@@ -41,6 +42,7 @@ class UpdateAgentRequest(BaseModel):
     phone_number: Optional[str] = None
     system_prompt: Optional[str] = None
     prompt_variables: Optional[str] = None  # JSON string
+    sentiment_analysis_prompt: Optional[str] = None  # Custom conditions for call sentiment analysis
     recognition_language: Optional[str] = None
     synthesis_voice_name: Optional[str] = None
     max_call_duration: Optional[int] = None
@@ -195,6 +197,7 @@ async def create_agent(request: CreateAgentRequest):
         description=request.description,
         phone_number=request.phone_number,
         system_prompt=request.system_prompt,
+        sentiment_analysis_prompt=request.sentiment_analysis_prompt,
         recognition_language=request.recognition_language,
         synthesis_voice_name=request.synthesis_voice_name,
         max_call_duration=request.max_call_duration,
@@ -234,6 +237,7 @@ async def get_agent(agent_id: str):
         "phone_number": agent.phone_number,
         "system_prompt": agent.system_prompt,
         "prompt_variables": agent.prompt_variables,
+        "sentiment_analysis_prompt": agent.sentiment_analysis_prompt,
         "recognition_language": agent.recognition_language,
         "synthesis_voice_name": agent.synthesis_voice_name,
         "max_call_duration": agent.max_call_duration,
@@ -264,6 +268,7 @@ async def update_agent(agent_id: str, request: UpdateAgentRequest):
         phone_number=request.phone_number,
         system_prompt=request.system_prompt,
         prompt_variables=request.prompt_variables,
+        sentiment_analysis_prompt=request.sentiment_analysis_prompt,
         recognition_language=request.recognition_language,
         synthesis_voice_name=request.synthesis_voice_name,
         max_call_duration=request.max_call_duration,

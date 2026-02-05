@@ -8,9 +8,13 @@ const AgentList = ({ API_URL, onEditAgent, onCreateAgent, addLog, user }) => {
     const fetchAgents = async () => {
         setLoading(true);
         try {
-            // MULTI-TENANT: Filter by user's organization if they have one
+            // MULTI-TENANT: 
+            // - Admin users see ALL agents (no filter)
+            // - Non-admin users only see their organization's agents
             let url = `${API_URL}/api/agents`;
-            if (user?.organizationId) {
+
+            // Only filter by organization for non-admin users
+            if (user?.role !== 'admin' && user?.organizationId) {
                 url += `?organization_id=${user.organizationId}`;
             }
 

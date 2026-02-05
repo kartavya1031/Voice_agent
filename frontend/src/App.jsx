@@ -3,6 +3,7 @@ import './App.css'
 import { useAuth } from './auth/AuthContext.jsx'
 import AgentList from './components/AgentList.jsx'
 import AgentConfig from './components/AgentConfig.jsx'
+import BulkCampaign from './components/BulkCampaign.jsx'
 
 // const API_URL = 'https://voice.anvenssa.com'
 // const WS_URL = 'wss://voice.anvenssa.com/ws/audio'
@@ -51,6 +52,18 @@ function App() {
     const [playingRecordingId, setPlayingRecordingId] = useState(null)
     const [statusFilter, setStatusFilter] = useState('all')
     const [dateFilter, setDateFilter] = useState('')
+    const [sentimentFilter, setSentimentFilter] = useState('all')
+    // Column visibility - users can toggle which columns to show
+    const [visibleColumns, setVisibleColumns] = useState({
+        date: true,
+        initiatedBy: true,
+        contact: true,
+        number: true,
+        duration: true,
+        status: true,
+        sentiment: true,
+        actions: true
+    })
     const audioPlayerRef = useRef(null)
 
     const fileInputRef = useRef(null)
@@ -227,10 +240,13 @@ function App() {
         try {
             setCallStatus('connecting')
             addLog('🔌 Connecting to server...')
-            // Pass agent_id in WebSocket URL for multi-tenant support
-            const wsUrl = selectedTestAgentId
-                ? `${WS_URL}?agent_id=${selectedTestAgentId}`
-                : WS_URL
+            // Pass agent_id and user_id in WebSocket URL for multi-tenant support
+            let wsUrl = WS_URL
+            const params = []
+            if (selectedTestAgentId) params.push(`agent_id=${selectedTestAgentId}`)
+            if (user?.id) params.push(`user_id=${user.id}`)
+            if (params.length > 0) wsUrl += '?' + params.join('&')
+
             const selectedAgent = agents.find(a => a.id === selectedTestAgentId)
             if (selectedAgent) {
                 addLog(`🤖 Using agent: ${selectedAgent.name}`)
@@ -367,12 +383,12 @@ function App() {
     }, [])
 
     // Fetch agents list for browser testing selector
-    // MULTI-TENANT: Filter by user's organization
+    // MULTI-TENANT: Admin sees all, others see their org only
     const fetchAgentsList = async () => {
         try {
-            // Build URL with organization filter if user has one
+            // Admin users see all agents, non-admin users see their org only
             let url = `${API_URL}/api/agents`
-            if (user?.organizationId) {
+            if (user?.role !== 'admin' && user?.organizationId) {
                 url += `?organization_id=${user.organizationId}`
             }
 
@@ -443,14 +459,28 @@ function App() {
     // Call History Functions
     // ============================================
 
-    // MULTI-TENANT: Filter call history by user's organization
+    // MULTI-TENANT: Filter call history by user's organization and for non-admins, by user
     const fetchCallHistory = async () => {
         setLoadingHistory(true)
         try {
-            // Build URL with organization filter if user has one
+            // Build URL with organization and user filters
             let url = `${API_URL}/api/calls/history`
-            if (user?.organizationId) {
-                url += `?organization_id=${user.organizationId}`
+            const params = []
+
+            // Add organization filter for non-admin users only
+            // Admin users see all calls
+            if (user?.role !== 'admin' && user?.organizationId) {
+                params.push(`organization_id=${user.organizationId}`)
+            }
+
+            // For non-admin users, filter by their user_id so they only see their own calls
+            // Admins (super_admin, org_admin) can see all calls in their scope
+            if (user?.id && user?.role !== 'super_admin' && user?.role !== 'org_admin') {
+                params.push(`user_id=${user.id}`)
+            }
+
+            if (params.length > 0) {
+                url += '?' + params.join('&')
             }
 
             const res = await fetch(url)
@@ -506,6 +536,7 @@ function App() {
     const getFilteredCallHistory = () => {
         return callHistory.filter(call => {
             if (statusFilter !== 'all' && call.status !== statusFilter) return false
+            if (sentimentFilter !== 'all' && call.sentiment !== sentimentFilter) return false
             if (dateFilter) {
                 const callDate = new Date(call.start_time || call.created_at).toISOString().split('T')[0]
                 if (callDate !== dateFilter) return false
@@ -524,6 +555,10 @@ function App() {
             case 'recording_failed': return 'status-badge failed'
             default: return 'status-badge'
         }
+    }
+
+    const toggleColumn = (column) => {
+        setVisibleColumns(prev => ({ ...prev, [column]: !prev[column] }))
     }
 
     const formatDateTime = (dateStr) => {
@@ -672,7 +707,16 @@ function App() {
                                                 </label>
                                                 <select
                                                     value={selectedTestAgentId}
-                                                    onChange={(e) => setSelectedTestAgentId(e.target.value)}
+                                                    onChange={(e) => {
+                                                        console.log('Agent selector changed:', e.target.value);
+                                                        setSelectedTestAgentId(e.target.value);
+                                                        const agent = agents.find(a => a.id === e.target.value);
+                                                        if (agent) {
+                                                            addLog(`🔄 Switched to agent: ${agent.name}`);
+                                                        } else {
+                                                            addLog(`🔄 Switched to default agent`);
+                                                        }
+                                                    }}
                                                     style={{
                                                         padding: '8px 16px',
                                                         borderRadius: '8px',
@@ -765,6 +809,17 @@ function App() {
                                     </div>
                                 </div>
                             </section>
+
+                            {/* Bulk Calling Campaign Section */}
+                            <section className="section">
+                                <h2 className="section-title">Bulk Calling</h2>
+                                <BulkCampaign
+                                    API_URL={API_URL}
+                                    agents={agents}
+                                    user={user}
+                                    addLog={addLog}
+                                />
+                            </section>
                         </>
                     )}
 
@@ -785,6 +840,7 @@ function App() {
                             onSave={handleSaveAgent}
                             onCancel={handleCancelAgent}
                             addLog={addLog}
+                            organizationId={user?.organizationId}
                         />
                     )}
 
@@ -799,6 +855,31 @@ function App() {
                                         <option value="answered">Answered</option>
                                         <option value="failed">Failed</option>
                                     </select>
+                                    <select value={sentimentFilter} onChange={e => setSentimentFilter(e.target.value)} className="filter-select">
+                                        <option value="all">All Sentiments</option>
+                                        <option value="Interested">Interested</option>
+                                        <option value="Not Interested">Not Interested</option>
+                                        <option value="Callback Requested">Callback Requested</option>
+                                        <option value="Already Customer">Already Customer</option>
+                                        <option value="Needs Info">Needs Info</option>
+                                        <option value="Busy/Maybe Later">Busy/Maybe Later</option>
+                                        <option value="Unclear">Unclear</option>
+                                    </select>
+
+                                    {/* Column Visibility Toggle */}
+                                    <div className="column-toggle-dropdown">
+                                        <button className="column-toggle-btn">📊 Columns ▾</button>
+                                        <div className="column-toggle-menu">
+                                            <label><input type="checkbox" checked={visibleColumns.date} onChange={() => toggleColumn('date')} /> Date</label>
+                                            <label><input type="checkbox" checked={visibleColumns.initiatedBy} onChange={() => toggleColumn('initiatedBy')} /> Initiated By</label>
+                                            <label><input type="checkbox" checked={visibleColumns.contact} onChange={() => toggleColumn('contact')} /> Contact</label>
+                                            <label><input type="checkbox" checked={visibleColumns.number} onChange={() => toggleColumn('number')} /> Number</label>
+                                            <label><input type="checkbox" checked={visibleColumns.duration} onChange={() => toggleColumn('duration')} /> Duration</label>
+                                            <label><input type="checkbox" checked={visibleColumns.status} onChange={() => toggleColumn('status')} /> Status</label>
+                                            <label><input type="checkbox" checked={visibleColumns.sentiment} onChange={() => toggleColumn('sentiment')} /> Sentiment</label>
+                                            <label><input type="checkbox" checked={visibleColumns.actions} onChange={() => toggleColumn('actions')} /> Actions</label>
+                                        </div>
+                                    </div>
                                 </div>
                             </section>
                             <section className="section">
@@ -807,23 +888,38 @@ function App() {
                                         <table className="call-history-table">
                                             <thead>
                                                 <tr>
-                                                    <th>Date</th><th>Contact</th><th>Number</th><th>Duration</th><th>Status</th><th>Actions</th>
+                                                    {visibleColumns.date && <th>Date</th>}
+                                                    {visibleColumns.initiatedBy && <th>Initiated By</th>}
+                                                    {visibleColumns.contact && <th>Contact</th>}
+                                                    {visibleColumns.number && <th>Number</th>}
+                                                    {visibleColumns.duration && <th>Duration</th>}
+                                                    {visibleColumns.status && <th>Status</th>}
+                                                    {visibleColumns.sentiment && <th>Sentiment</th>}
+                                                    {visibleColumns.actions && <th>Actions</th>}
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {getFilteredCallHistory().map(call => (
                                                     <tr key={call.id}>
-                                                        <td>{formatDateTime(call.start_time || call.created_at)}</td>
-                                                        <td>{call.from_number ? 'Outbound' : 'Unknown'}</td>
-                                                        <td>{call.to_number || call.from_number || 'N/A'}</td>
-                                                        <td>{formatDuration(call.duration_seconds || 0)}</td>
-                                                        <td><span className={getStatusBadgeClass(call.status)}>{call.status}</span></td>
-                                                        <td>
-                                                            <button className="action-btn" onClick={() => call.has_transcript && viewTranscript(call.id)} disabled={!call.has_transcript}>👁️</button>
-                                                            <button className="action-btn" onClick={() => call.recording_url && playRecording(call)} disabled={!call.recording_url}>
-                                                                {playingRecordingId === call.id ? '⏹️' : '▶️'}
-                                                            </button>
-                                                        </td>
+                                                        {visibleColumns.date && <td>{formatDateTime(call.start_time || call.created_at)}</td>}
+                                                        {visibleColumns.initiatedBy && <td>{call.user_name || 'System'}</td>}
+                                                        {visibleColumns.contact && <td>{call.from_number ? 'Outbound' : 'Unknown'}</td>}
+                                                        {visibleColumns.number && <td>{call.to_number || call.from_number || 'N/A'}</td>}
+                                                        {visibleColumns.duration && <td>{formatDuration(call.duration_seconds || 0)}</td>}
+                                                        {visibleColumns.status && <td><span className={getStatusBadgeClass(call.status)}>{call.status}</span></td>}
+                                                        {visibleColumns.sentiment && (
+                                                            <td className="sentiment-cell">
+                                                                {call.sentiment || 'Pending'}
+                                                            </td>
+                                                        )}
+                                                        {visibleColumns.actions && (
+                                                            <td>
+                                                                <button className="action-btn" onClick={() => call.has_transcript && viewTranscript(call.id)} disabled={!call.has_transcript}>👁️</button>
+                                                                <button className="action-btn" onClick={() => call.recording_url && playRecording(call)} disabled={!call.recording_url}>
+                                                                    {playingRecordingId === call.id ? '⏹️' : '▶️'}
+                                                                </button>
+                                                            </td>
+                                                        )}
                                                     </tr>
                                                 ))}
                                             </tbody>

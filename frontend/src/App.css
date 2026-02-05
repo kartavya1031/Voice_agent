@@ -1249,6 +1249,75 @@ body {
   color: white;
 }
 
+/* Sentiment Cell - Simple text display */
+.sentiment-cell {
+  font-weight: 500;
+  color: var(--text-dark);
+}
+
+/* Column Toggle Dropdown */
+.column-toggle-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.column-toggle-btn {
+  padding: 10px 16px;
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: var(--text-dark);
+  transition: all 0.2s;
+}
+
+.column-toggle-btn:hover {
+  border-color: var(--accent);
+  background: var(--bg-light);
+}
+
+.column-toggle-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  min-width: 160px;
+  padding: 8px 0;
+}
+
+.column-toggle-dropdown:hover .column-toggle-menu,
+.column-toggle-dropdown:focus-within .column-toggle-menu {
+  display: block;
+}
+
+.column-toggle-menu label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-dark);
+  transition: background 0.2s;
+}
+
+.column-toggle-menu label:hover {
+  background: var(--bg-light);
+}
+
+.column-toggle-menu input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
 /* Action Buttons */
 .actions-cell {
   display: flex;

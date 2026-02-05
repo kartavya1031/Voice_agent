@@ -184,20 +184,28 @@ const AgentConfig = ({ API_URL, agentId, onSave, onCancel, addLog, organizationI
         try {
             let res;
             if (!agentId) {
-                const orgRes = await fetch(`${API_URL}/api/organizations`);
-                const orgData = await orgRes.json();
-                let orgId = agent.organization_id;
-                if (orgData.organizations && orgData.organizations.length > 0) {
-                    orgId = orgData.organizations[0].id;
-                } else {
-                    const newOrg = await fetch(`${API_URL}/api/organizations`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: 'Default Organization' })
-                    });
-                    const newOrgData = await newOrg.json();
-                    if (newOrgData.organization) orgId = newOrgData.organization.id;
+                // MULTI-TENANT FIX: Use the organizationId from props (logged-in user's org)
+                // instead of fetching the first organization
+                let orgId = organizationId || agent.organization_id;
+
+                // Only fetch/create default org if user has no organization
+                if (!orgId) {
+                    const orgRes = await fetch(`${API_URL}/api/organizations`);
+                    const orgData = await orgRes.json();
+                    if (orgData.organizations && orgData.organizations.length > 0) {
+                        orgId = orgData.organizations[0].id;
+                    } else {
+                        const newOrg = await fetch(`${API_URL}/api/organizations`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: 'Default Organization' })
+                        });
+                        const newOrgData = await newOrg.json();
+                        if (newOrgData.organization) orgId = newOrgData.organization.id;
+                    }
                 }
+
+                console.log('Creating agent with organization_id:', orgId);
                 res = await fetch(`${API_URL}/api/agents`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -307,7 +315,8 @@ const AgentConfig = ({ API_URL, agentId, onSave, onCancel, addLog, organizationI
         { id: 'general', label: 'General', icon: '⚙️' },
         { id: 'behavior', label: 'Behavior', icon: '🧠' },
         { id: 'voice', label: 'Voice Settings', icon: '🎙️' },
-        { id: 'knowledge', label: 'Knowledge Base', icon: '📚', disabled: !agentId }
+        { id: 'knowledge', label: 'Knowledge Base', icon: '📚', disabled: !agentId },
+        { id: 'sentiment', label: 'Sentiment Analysis', icon: '🎯' }
     ];
 
     if (loading && !agent.name) {
@@ -788,6 +797,81 @@ const AgentConfig = ({ API_URL, agentId, onSave, onCancel, addLog, organizationI
                                             ))}
                                         </div>
                                     )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Sentiment Analysis Tab */}
+                    {activeTab === 'sentiment' && (
+                        <div className="tab-panel">
+                            <div className="panel-header">
+                                <h2>Sentiment Analysis</h2>
+                                <p>Configure how call outcomes are analyzed after each call ends</p>
+                            </div>
+
+                            <div className="form-card">
+                                <div className="form-section">
+                                    <div className="section-header">
+                                        <h3>Analysis Conditions</h3>
+                                        <span className="section-badge">Custom Rules</span>
+                                    </div>
+                                    <p className="section-description">
+                                        Define the conditions the AI should check when analyzing call transcripts.
+                                        The analysis runs automatically after each call ends.
+                                    </p>
+
+                                    <div className="form-group">
+                                        <div className="prompt-editor">
+                                            <div className="prompt-toolbar">
+                                                <span className="toolbar-hint">Define what outcomes to detect</span>
+                                                <span className="char-count">{agent.sentiment_analysis_prompt?.length || 0} characters</span>
+                                            </div>
+                                            <textarea
+                                                name="sentiment_analysis_prompt"
+                                                value={agent.sentiment_analysis_prompt || ''}
+                                                onChange={handleChange}
+                                                rows={12}
+                                                className="prompt-textarea"
+                                                placeholder={`Example conditions to analyze:
+
+1. Is the user interested in the product/service? (Yes/No/Maybe)
+2. Does the user want a callback or follow-up?
+3. Is the user already a customer?
+4. Did the user express any complaints or concerns?
+5. Did the user mention a specific budget or timeline?
+6. What is the overall mood of the conversation? (Positive/Neutral/Negative)
+7. Did the user ask for pricing information?
+8. Would this be considered a qualified lead?`}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="tip-card">
+                                        <span className="tip-icon">💡</span>
+                                        <div className="tip-content">
+                                            <strong>How it works:</strong> After each call, the transcript is analyzed using these conditions.
+                                            Results are saved and displayed in the call history as "Sentiment" (e.g., "Interested", "Not Interested", "Callback Requested").
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="form-card">
+                                <div className="form-section">
+                                    <h3>Default Sentiment Categories</h3>
+                                    <p className="section-description">
+                                        If no custom conditions are set, the following default categories are used:
+                                    </p>
+                                    <div className="sentiment-categories">
+                                        <span className="sentiment-tag interested">Interested</span>
+                                        <span className="sentiment-tag not-interested">Not Interested</span>
+                                        <span className="sentiment-tag callback">Callback Requested</span>
+                                        <span className="sentiment-tag customer">Already Customer</span>
+                                        <span className="sentiment-tag needs-info">Needs Info</span>
+                                        <span className="sentiment-tag busy">Busy/Maybe Later</span>
+                                        <span className="sentiment-tag unclear">Unclear</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1653,6 +1737,29 @@ const AgentConfig = ({ API_URL, agentId, onSave, onCancel, addLog, organizationI
                         justify-content: space-between;
                     }
                 }
+
+                /* Sentiment Analysis Styles */
+                .sentiment-categories {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 8px;
+                    margin-top: 12px;
+                }
+
+                .sentiment-tag {
+                    padding: 6px 14px;
+                    border-radius: 20px;
+                    font-size: 0.85rem;
+                    font-weight: 500;
+                }
+
+                .sentiment-tag.interested { background: #4caf50; color: white; }
+                .sentiment-tag.not-interested { background: #f44336; color: white; }
+                .sentiment-tag.callback { background: #2196f3; color: white; }
+                .sentiment-tag.customer { background: #9c27b0; color: white; }
+                .sentiment-tag.needs-info { background: #ff9800; color: white; }
+                .sentiment-tag.busy { background: #607d8b; color: white; }
+                .sentiment-tag.unclear { background: #9e9e9e; color: white; }
             `}</style>
         </div>
     );

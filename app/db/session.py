@@ -117,6 +117,35 @@ def init_db():
                 except Exception as e:
                     print(f"   ⚠️ Could not add agent_id column to knowledge_bases: {e}")
             
+            # Check/Add sentiment_analysis_prompt to agents (NEW - Sentiment Analysis)
+            try:
+                conn.execute(text("SELECT sentiment_analysis_prompt FROM agents LIMIT 1"))
+            except Exception:
+                print("🔄 Migrating: Adding sentiment_analysis_prompt to agents table")
+                try:
+                    conn.execute(text("ALTER TABLE agents ADD COLUMN sentiment_analysis_prompt TEXT"))
+                except Exception as e:
+                    print(f"   ⚠️ Could not add sentiment_analysis_prompt column: {e}")
+            
+            # Check/Add sentiment and sentiment_details to calls (NEW - Sentiment Analysis)
+            try:
+                conn.execute(text("SELECT sentiment FROM calls LIMIT 1"))
+            except Exception:
+                print("🔄 Migrating: Adding sentiment to calls table")
+                try:
+                    conn.execute(text("ALTER TABLE calls ADD COLUMN sentiment VARCHAR(50)"))
+                except Exception as e:
+                    print(f"   ⚠️ Could not add sentiment column: {e}")
+            
+            try:
+                conn.execute(text("SELECT sentiment_details FROM calls LIMIT 1"))
+            except Exception:
+                print("🔄 Migrating: Adding sentiment_details to calls table")
+                try:
+                    conn.execute(text("ALTER TABLE calls ADD COLUMN sentiment_details TEXT"))
+                except Exception as e:
+                    print(f"   ⚠️ Could not add sentiment_details column: {e}")
+            
             conn.commit()
                     
     except Exception as e:

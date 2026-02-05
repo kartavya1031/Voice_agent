@@ -233,12 +233,24 @@ async def handle_frejun_unified_webhook(request: Request):
             if event in status_map and call_id:
                 call_service.update_call_status(call_id, status_map[event])
                 
-                # If call completed, update duration
+                # If call completed, update duration and run sentiment analysis
                 if event == "call.completed":
                     duration = data.get("duration")
                     if duration and call_id:
                         from app.db.service import call_service
                         call_service.end_call(call_id, "completed", duration)
+                    
+                    # Trigger sentiment analysis
+                    try:
+                        transcript_content = call_service.get_call_transcript(call_id)
+                        if transcript_content:
+                            from app.services.sentiment_analysis import analyze_and_save_sentiment
+                            call = call_service.get_call_by_provider_id(call_id)
+                            agent_id = call.agent_id if call else None
+                            print(f"   🎯 Running sentiment analysis for call {call_id}...")
+                            analyze_and_save_sentiment(call_id if not call else call.id, transcript_content, agent_id)
+                    except Exception as sentiment_error:
+                        print(f"   ⚠️ Sentiment analysis failed: {sentiment_error}")
             
             return {"status": "ok", "message": f"{event} event processed"}
         else:

@@ -61,6 +61,11 @@ class Agent(Base):
     # Knowledge Base
     active_kb_id = Column(String(36), nullable=True)  # ChromaDB collection ID
     
+    # Sentiment Analysis Configuration
+    # This prompt is used to analyze call transcripts and determine outcomes
+    # Example: "Analyze if the user is: 1) Interested in the product 2) Wants a callback 3) Already a customer"
+    sentiment_analysis_prompt = Column(Text, nullable=True)
+    
     # Speech Settings
     recognition_language = Column(String(10), default="en-IN")
     synthesis_voice_name = Column(String(50), default="en-IN-NeerjaNeural")
@@ -159,6 +164,7 @@ class Call(Base):
     id = Column(String(36), primary_key=True, default=generate_uuid)
     agent_id = Column(String(36), ForeignKey("agents.id"), nullable=True, index=True)  # Which agent handled the call
     user_id = Column(String(36), ForeignKey("users.id"), nullable=True)  # Link to user who made the call
+    campaign_id = Column(String(36), ForeignKey("campaigns.id"), nullable=True, index=True)  # Link to bulk campaign
     call_provider = Column(String(20), nullable=True)  # 'websocket', 'twilio', 'frejun'
     provider_call_id = Column(String(100), nullable=True)
     from_number = Column(String(20), nullable=True)
@@ -173,6 +179,12 @@ class Call(Base):
     recording_id = Column(String(100), nullable=True)  # Recording ID from FreJun
     stream_id = Column(String(100), nullable=True)  # Stream ID from FreJun
     created_at = Column(TIMESTAMP, default=datetime.utcnow)
+    
+    # Sentiment Analysis Results
+    # sentiment: Brief status like "Interested", "Not Interested", "Callback Requested", etc.
+    # sentiment_details: JSON string with full analysis including conditions matched
+    sentiment = Column(String(50), nullable=True)
+    sentiment_details = Column(Text, nullable=True)  # JSON string with detailed analysis
     
     # Relationships
     agent = relationship("Agent", back_populates="calls")
@@ -236,3 +248,92 @@ class CallMetric(Base):
     def __repr__(self):
         return f"<CallMetric(call_id={self.call_id}, interruptions={self.interruption_count})>"
 
+
+# =============================================================================
+# BULK CALLING / CAMPAIGN MODELS
+# =============================================================================
+
+class Campaign(Base):
+    """
+    Bulk calling campaign - tracks a batch of calls from CSV upload.
+    Each campaign belongs to a user and uses a specific agent.
+    """
+    __tablename__ = "campaigns"
+    
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    agent_id = Column(String(36), ForeignKey("agents.id"), nullable=False, index=True)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)  # Who started
+    organization_id = Column(String(36), ForeignKey("organizations.id"), nullable=True, index=True)
+    
+    name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    
+    # Progress tracking
+    total_calls = Column(Integer, default=0)
+    completed_calls = Column(Integer, default=0)
+    successful_calls = Column(Integer, default=0)
+    failed_calls = Column(Integer, default=0)
+    
+    # Campaign settings
+    call_delay_seconds = Column(Integer, default=30)  # Delay between calls (default 30s)
+    status = Column(String(20), default='pending')  # pending/running/paused/completed/stopped
+    
+    # Timestamps
+    created_at = Column(TIMESTAMP, default=datetime.utcnow)
+    started_at = Column(TIMESTAMP, nullable=True)
+    completed_at = Column(TIMESTAMP, nullable=True)
+    
+    # Relationships
+    agent = relationship("Agent")
+    user = relationship("User")
+    organization = relationship("Organization")
+    campaign_calls = relationship("CampaignCall", back_populates="campaign", cascade="all, delete-orphan")
+    
+    def __repr__(self):
+        return f"<Campaign(id={self.id}, name={self.name}, status={self.status})>"
+
+
+class CampaignCall(Base):
+    """
+    Individual call within a campaign.
+    Tracks status, variables, and links to the actual Call record.
+    """
+    __tablename__ = "campaign_calls"
+    
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    campaign_id = Column(String(36), ForeignKey("campaigns.id"), nullable=False, index=True)
+    
+    # Call details
+    phone_number = Column(String(20), nullable=False)
+    variables = Column(Text, nullable=True)  # JSON string of dynamic prompt variables
+    
+    # Status tracking
+    status = Column(String(20), default='pending')  # pending/calling/completed/failed/retry
+    attempt_count = Column(Integer, default=0)  # Number of call attempts
+    error_message = Column(Text, nullable=True)  # Error if failed
+    
+    # Position in queue (for retry logic - failed calls pushed to end)
+    queue_position = Column(Integer, default=0)
+    
+    # Link to actual Call record
+    call_id = Column(String(36), ForeignKey("calls.id"), nullable=True)
+    
+    # Timestamps
+    created_at = Column(TIMESTAMP, default=datetime.utcnow)
+    called_at = Column(TIMESTAMP, nullable=True)
+    completed_at = Column(TIMESTAMP, nullable=True)
+    
+    # Relationships
+    campaign = relationship("Campaign", back_populates="campaign_calls")
+    call = relationship("Call")
+    
+    def __repr__(self):
+        return f"<CampaignCall(id={self.id}, phone={self.phone_number}, status={self.status})>"
+    
+    def get_variables_dict(self) -> dict:
+        """Parse variables JSON string to dict"""
+        import json
+        try:
+            return json.loads(self.variables) if self.variables else {}
+        except:
+            return {}
