@@ -69,9 +69,14 @@ def create_campaign(
     """Create a new campaign with its calls"""
     db = SessionLocal()
     try:
-        # Get user's organization
+        # Get user's organization - user must exist (FK constraint)
         user = db.query(User).filter(User.id == user_id).first()
-        org_id = user.organization_id if user else None
+        if not user:
+            raise HTTPException(
+                status_code=404,
+                detail=f"User {user_id} not found. Please ensure you are logged in with a valid account."
+            )
+        org_id = user.organization_id
         
         # Create campaign
         campaign = Campaign(

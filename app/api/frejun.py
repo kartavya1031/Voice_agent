@@ -45,6 +45,8 @@ active_calls = {}
 class InitiateCallRequest(BaseModel):
     to_number: str
     record: bool = True
+    agent_id: Optional[str] = None
+    user_id: Optional[str] = None
 
 
 class InitiateCallResponse(BaseModel):
@@ -145,6 +147,8 @@ async def initiate_call(request: InitiateCallRequest, req: Request):
                 active_calls[call_id] = {
                     "to_number": to_number,
                     "from_number": FREJUN_FROM_NUMBER,
+                    "agent_id": request.agent_id,
+                    "user_id": request.user_id,
                     "status": "initiated",
                     "started_at": datetime.now().isoformat(),
                     "frejun_call_id": frejun_call_id
@@ -154,14 +158,16 @@ async def initiate_call(request: InitiateCallRequest, req: Request):
                 if frejun_call_id and frejun_call_id != call_id:
                     active_calls[frejun_call_id] = active_calls[call_id]
                 
-                # Save call to database with phone numbers
+                # Save call to database with phone numbers and agent
                 from app.db.service import call_service
                 try:
                     call_record = call_service.create_call(
                         call_provider="frejun",
                         provider_call_id=frejun_call_id,
                         from_number=FREJUN_FROM_NUMBER,
-                        to_number=to_number
+                        to_number=to_number,
+                        agent_id=request.agent_id,
+                        user_id=request.user_id
                     )
                     print(f"💾 Call saved to database with ID: {call_record.id}")
                 except Exception as db_error:
@@ -233,7 +239,7 @@ async def initiate_campaign_call(
     call_id = str(uuid.uuid4())[:8]
     
     # Get base URL for flow
-    base_url = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000")
+    base_url = os.getenv("PUBLIC_BASE_URL", "https://voice.anvenssa.com")
     flow_url = f"{base_url}/api/frejun/flow/{call_id}"
     status_callback_url = f"{base_url}/api/frejun/webhook"
     
@@ -341,12 +347,24 @@ async def get_call_flow(call_id: str, req: Request):
     
     ws_url = f"{ws_url}/ws/frejun-audio"
     
-    print(f"📋 FreJun requesting flow for call {call_id} ({req.method})")
-    print(f"   Returning WebSocket URL: {ws_url}")
-    
-    # Update call status
+    # Pass agent_id and user_id from active_calls into the WebSocket URL
+    # so the FreJun WebSocket handler can load the correct agent config
+    query_params = []
     if call_id in active_calls:
         active_calls[call_id]["status"] = "connected"
+        call_info = active_calls[call_id]
+        if call_info.get("agent_id"):
+            query_params.append(f"agent_id={call_info['agent_id']}")
+        if call_info.get("user_id"):
+            query_params.append(f"user_id={call_info['user_id']}")
+        if call_info.get("campaign_id"):
+            query_params.append(f"campaign_id={call_info['campaign_id']}")
+    
+    if query_params:
+        ws_url = f"{ws_url}?{'&'.join(query_params)}"
+    
+    print(f"📋 FreJun requesting flow for call {call_id} ({req.method})")
+    print(f"   Returning WebSocket URL: {ws_url}")
     
     # Return stream flow configuration with barge-in enabled
     return {
@@ -493,8 +511,10 @@ async def frejun_webhook(request: Request):
                         )
                     
                     if event == "call.completed":
-                        duration = data.get("duration", 0)
-                        call_service.end_call(call_id, "completed", duration)
+                        # FreJun reports duration in milliseconds, convert to seconds
+                        duration_ms = data.get("duration", 0)
+                        duration_seconds = int(duration_ms / 1000) if duration_ms > 1000 else duration_ms
+                        call_service.end_call(call_id, "completed", duration_seconds)
                         
                         # Trigger sentiment analysis for completed calls
                         try:

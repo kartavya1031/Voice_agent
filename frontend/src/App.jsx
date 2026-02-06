@@ -5,10 +5,10 @@ import AgentList from './components/AgentList.jsx'
 import AgentConfig from './components/AgentConfig.jsx'
 import BulkCampaign from './components/BulkCampaign.jsx'
 
-// const API_URL = 'https://voice.anvenssa.com'
-// const WS_URL = 'wss://voice.anvenssa.com/ws/audio'
-const API_URL = 'http://localhost:8000'
-const WS_URL = 'ws://localhost:8000/ws/audio'
+const API_URL = 'https://voice.anvenssa.com'
+const WS_URL = 'wss://voice.anvenssa.com/ws/audio'
+// const API_URL = 'http://localhost:8000'
+// const WS_URL = 'ws://localhost:8000/ws/audio'
 
 function App() {
 
@@ -431,7 +431,12 @@ function App() {
             const res = await fetch(`${API_URL}/api/frejun/initiate-call`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ to_number: phoneNumber, record: true })
+                body: JSON.stringify({
+                    to_number: phoneNumber,
+                    record: true,
+                    agent_id: selectedTestAgentId || null,
+                    user_id: user?.id || null
+                })
             })
             const data = await res.json()
             if (data.success) {

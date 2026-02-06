@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 
 // API URL - same as in App.jsx
-const API_URL = 'http://localhost:8000';
+const API_URL = 'https://voice.anvenssa.com';
 
 const AuthContext = createContext(null);
 

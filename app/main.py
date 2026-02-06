@@ -290,9 +290,14 @@ async def get_call_recording(call_id: str):
         if not recording_url:
             return {"error": "No recording available for this call"}
         
-        # Fetch the recording from FreJun
+        # Fetch the recording from FreJun (requires API key authentication)
+        frejun_api_key = os.getenv("FREJUN_API_KEY", "")
+        headers = {}
+        if frejun_api_key and "frejun.ai" in recording_url:
+            headers["x-api-key"] = frejun_api_key
+        
         async with httpx.AsyncClient() as client:
-            response = await client.get(recording_url, follow_redirects=True)
+            response = await client.get(recording_url, headers=headers, follow_redirects=True, timeout=30.0)
             
             if response.status_code != 200:
                 return {"error": f"Failed to fetch recording: {response.status_code}"}
@@ -623,50 +628,52 @@ def get_available_voices():
     """Get list of available Azure Speech voices"""
     # Common Azure voices for different languages
     # Added more natural-sounding and conversational voices
+    # Voice data includes both old fields (id, name, language) and new fields
+    # (shortName, localName, gender, locale) for frontend compatibility
     voices = [
         # English - India (Most Natural)
-        {"id": "en-IN-NeerjaNeural", "name": "Neerja (Indian English, Female) ⭐ Recommended", "language": "en-IN"},
-        {"id": "en-IN-PrabhatNeural", "name": "Prabhat (Indian English, Male)", "language": "en-IN"},
+        {"id": "en-IN-NeerjaNeural", "shortName": "en-IN-NeerjaNeural", "localName": "Neerja (Indian English, Female) ⭐ Recommended", "name": "Neerja", "gender": "Female", "locale": "en-IN", "language": "en-IN"},
+        {"id": "en-IN-PrabhatNeural", "shortName": "en-IN-PrabhatNeural", "localName": "Prabhat (Indian English, Male)", "name": "Prabhat", "gender": "Male", "locale": "en-IN", "language": "en-IN"},
         # English - US (Very Natural)
-        {"id": "en-US-JennyNeural", "name": "Jenny (US English, Female) ⭐ Very Natural", "language": "en-US"},
-        {"id": "en-US-JennyMultilingualNeural", "name": "Jenny Multilingual (US, Female) ⭐ Most Natural", "language": "en-US"},
-        {"id": "en-US-GuyNeural", "name": "Guy (US English, Male)", "language": "en-US"},
-        {"id": "en-US-AriaNeural", "name": "Aria (US English, Female) ⭐ Conversational", "language": "en-US"},
-        {"id": "en-US-DavisNeural", "name": "Davis (US English, Male) ⭐ Warm", "language": "en-US"},
-        {"id": "en-US-JasonNeural", "name": "Jason (US English, Male)", "language": "en-US"},
-        {"id": "en-US-SaraNeural", "name": "Sara (US English, Female)", "language": "en-US"},
+        {"id": "en-US-JennyNeural", "shortName": "en-US-JennyNeural", "localName": "Jenny (US English, Female) ⭐ Very Natural", "name": "Jenny", "gender": "Female", "locale": "en-US", "language": "en-US"},
+        {"id": "en-US-JennyMultilingualNeural", "shortName": "en-US-JennyMultilingualNeural", "localName": "Jenny Multilingual (US, Female) ⭐ Most Natural", "name": "Jenny Multilingual", "gender": "Female", "locale": "en-US", "language": "en-US"},
+        {"id": "en-US-GuyNeural", "shortName": "en-US-GuyNeural", "localName": "Guy (US English, Male)", "name": "Guy", "gender": "Male", "locale": "en-US", "language": "en-US"},
+        {"id": "en-US-AriaNeural", "shortName": "en-US-AriaNeural", "localName": "Aria (US English, Female) ⭐ Conversational", "name": "Aria", "gender": "Female", "locale": "en-US", "language": "en-US"},
+        {"id": "en-US-DavisNeural", "shortName": "en-US-DavisNeural", "localName": "Davis (US English, Male) ⭐ Warm", "name": "Davis", "gender": "Male", "locale": "en-US", "language": "en-US"},
+        {"id": "en-US-JasonNeural", "shortName": "en-US-JasonNeural", "localName": "Jason (US English, Male)", "name": "Jason", "gender": "Male", "locale": "en-US", "language": "en-US"},
+        {"id": "en-US-SaraNeural", "shortName": "en-US-SaraNeural", "localName": "Sara (US English, Female)", "name": "Sara", "gender": "Female", "locale": "en-US", "language": "en-US"},
         # English - UK
-        {"id": "en-GB-SoniaNeural", "name": "Sonia (British English, Female)", "language": "en-GB"},
-        {"id": "en-GB-RyanNeural", "name": "Ryan (British English, Male)", "language": "en-GB"},
+        {"id": "en-GB-SoniaNeural", "shortName": "en-GB-SoniaNeural", "localName": "Sonia (British English, Female)", "name": "Sonia", "gender": "Female", "locale": "en-GB", "language": "en-GB"},
+        {"id": "en-GB-RyanNeural", "shortName": "en-GB-RyanNeural", "localName": "Ryan (British English, Male)", "name": "Ryan", "gender": "Male", "locale": "en-GB", "language": "en-GB"},
         # Hindi
-        {"id": "hi-IN-SwaraNeural", "name": "Swara (Hindi, Female)", "language": "hi-IN"},
-        {"id": "hi-IN-MadhurNeural", "name": "Madhur (Hindi, Male)", "language": "hi-IN"},
-        {"id": "hi-IN-AartiNeural", "name": "Aarti (Hindi, Female)", "language": "hi-IN"},
-        {"id": "hi-IN-KavyaNeural", "name": "Kavya (Hindi, Female)", "language": "hi-IN"},
+        {"id": "hi-IN-SwaraNeural", "shortName": "hi-IN-SwaraNeural", "localName": "Swara (Hindi, Female)", "name": "Swara", "gender": "Female", "locale": "hi-IN", "language": "hi-IN"},
+        {"id": "hi-IN-MadhurNeural", "shortName": "hi-IN-MadhurNeural", "localName": "Madhur (Hindi, Male)", "name": "Madhur", "gender": "Male", "locale": "hi-IN", "language": "hi-IN"},
+        {"id": "hi-IN-AartiNeural", "shortName": "hi-IN-AartiNeural", "localName": "Aarti (Hindi, Female)", "name": "Aarti", "gender": "Female", "locale": "hi-IN", "language": "hi-IN"},
+        {"id": "hi-IN-KavyaNeural", "shortName": "hi-IN-KavyaNeural", "localName": "Kavya (Hindi, Female)", "name": "Kavya", "gender": "Female", "locale": "hi-IN", "language": "hi-IN"},
         # Spanish
-        {"id": "es-ES-ElviraNeural", "name": "Elvira (Spanish, Female)", "language": "es-ES"},
-        {"id": "es-MX-DaliaNeural", "name": "Dalia (Mexican Spanish, Female)", "language": "es-MX"},
+        {"id": "es-ES-ElviraNeural", "shortName": "es-ES-ElviraNeural", "localName": "Elvira (Spanish, Female)", "name": "Elvira", "gender": "Female", "locale": "es-ES", "language": "es-ES"},
+        {"id": "es-MX-DaliaNeural", "shortName": "es-MX-DaliaNeural", "localName": "Dalia (Mexican Spanish, Female)", "name": "Dalia", "gender": "Female", "locale": "es-MX", "language": "es-MX"},
         # French
-        {"id": "fr-FR-DeniseNeural", "name": "Denise (French, Female)", "language": "fr-FR"},
+        {"id": "fr-FR-DeniseNeural", "shortName": "fr-FR-DeniseNeural", "localName": "Denise (French, Female)", "name": "Denise", "gender": "Female", "locale": "fr-FR", "language": "fr-FR"},
         # German
-        {"id": "de-DE-KatjaNeural", "name": "Katja (German, Female)", "language": "de-DE"},
+        {"id": "de-DE-KatjaNeural", "shortName": "de-DE-KatjaNeural", "localName": "Katja (German, Female)", "name": "Katja", "gender": "Female", "locale": "de-DE", "language": "de-DE"},
         # Japanese
-        {"id": "ja-JP-NanamiNeural", "name": "Nanami (Japanese, Female)", "language": "ja-JP"},
+        {"id": "ja-JP-NanamiNeural", "shortName": "ja-JP-NanamiNeural", "localName": "Nanami (Japanese, Female)", "name": "Nanami", "gender": "Female", "locale": "ja-JP", "language": "ja-JP"},
         # Chinese
-        {"id": "zh-CN-XiaoxiaoNeural", "name": "Xiaoxiao (Chinese, Female)", "language": "zh-CN"},
+        {"id": "zh-CN-XiaoxiaoNeural", "shortName": "zh-CN-XiaoxiaoNeural", "localName": "Xiaoxiao (Chinese, Female)", "name": "Xiaoxiao", "gender": "Female", "locale": "zh-CN", "language": "zh-CN"},
     ]
     
     languages = [
-        {"id": "en-IN", "name": "English (India)"},
-        {"id": "en-US", "name": "English (US)"},
-        {"id": "en-GB", "name": "English (UK)"},
-        {"id": "hi-IN", "name": "Hindi (India)"},
-        {"id": "es-ES", "name": "Spanish (Spain)"},
-        {"id": "es-MX", "name": "Spanish (Mexico)"},
-        {"id": "fr-FR", "name": "French (France)"},
-        {"id": "de-DE", "name": "German (Germany)"},
-        {"id": "ja-JP", "name": "Japanese (Japan)"},
-        {"id": "zh-CN", "name": "Chinese (Mainland)"},
+        {"id": "en-IN", "code": "en-IN", "name": "English (India)"},
+        {"id": "en-US", "code": "en-US", "name": "English (US)"},
+        {"id": "en-GB", "code": "en-GB", "name": "English (UK)"},
+        {"id": "hi-IN", "code": "hi-IN", "name": "Hindi (India)"},
+        {"id": "es-ES", "code": "es-ES", "name": "Spanish (Spain)"},
+        {"id": "es-MX", "code": "es-MX", "name": "Spanish (Mexico)"},
+        {"id": "fr-FR", "code": "fr-FR", "name": "French (France)"},
+        {"id": "de-DE", "code": "de-DE", "name": "German (Germany)"},
+        {"id": "ja-JP", "code": "ja-JP", "name": "Japanese (Japan)"},
+        {"id": "zh-CN", "code": "zh-CN", "name": "Chinese (Mainland)"},
     ]
     
     return {"voices": voices, "languages": languages}
@@ -1423,6 +1430,8 @@ async def frejun_audio_ws(ws: WebSocket):
     # =========================================================================
     agent_id = ws.query_params.get("agent_id")
     query_call_id = ws.query_params.get("call_id")
+    query_campaign_id = ws.query_params.get("campaign_id")
+    query_user_id = ws.query_params.get("user_id")
     
     # Agent-specific configuration (defaults to global settings)
     agent_config = {
@@ -1435,6 +1444,21 @@ async def frejun_audio_ws(ws: WebSocket):
         "max_silence_duration": 20,  # 20 seconds
     }
     
+    # If no agent_id in query params, try to find it from active_calls
+    # (the flow endpoint stores agent_id/user_id from the initiate-call request)
+    if not agent_id:
+        from app.api.frejun import active_calls as frejun_active_calls
+        # Find the most recent active call that has an agent_id
+        for cid, cinfo in frejun_active_calls.items():
+            if cinfo.get("agent_id") and cinfo.get("status") in ("initiated", "connected"):
+                agent_id = cinfo["agent_id"]
+                if not query_user_id:
+                    query_user_id = cinfo.get("user_id")
+                if not query_campaign_id:
+                    query_campaign_id = cinfo.get("campaign_id")
+                print(f"   🔍 Found agent_id from active_calls: {agent_id}")
+                break
+    
     if agent_id:
         try:
             from app.db.service import agent_service
@@ -1442,19 +1466,37 @@ async def frejun_audio_ws(ws: WebSocket):
             if agent:
                 print(f"   🤖 Loading agent: {agent.name} (ID: {agent_id})")
                 agent_config["agent_name"] = agent.name
-                agent_config["system_prompt"] = agent.system_prompt
-                agent_config["kb_id"] = agent.active_knowledge_base_id
+                # Use get_resolved_system_prompt() for variable substitution (same as browser WS)
+                agent_config["system_prompt"] = agent.get_resolved_system_prompt()
+                agent_config["kb_id"] = agent.active_kb_id
                 agent_config["recognition_language"] = agent.recognition_language or "en-IN"
                 agent_config["synthesis_voice"] = agent.synthesis_voice_name or "en-IN-NeerjaNeural"
                 agent_config["max_call_duration"] = agent.max_call_duration or 600
                 agent_config["max_silence_duration"] = agent.max_silence_duration or 20
                 print(f"   📚 KB: {agent_config['kb_id']}, Voice: {agent_config['synthesis_voice']}")
+                
+                # Apply campaign-specific CSV variables to the system prompt
+                # (override agent's default prompt_variables with per-call values)
+                from app.api.frejun import active_calls as frejun_active_calls
+                campaign_variables = None
+                for cid, cinfo in frejun_active_calls.items():
+                    if cinfo.get("agent_id") == agent_id and cinfo.get("campaign_id"):
+                        campaign_variables = cinfo.get("variables", {})
+                        break
+                
+                if campaign_variables:
+                    prompt = agent_config["system_prompt"]
+                    for key, value in campaign_variables.items():
+                        if value:
+                            prompt = prompt.replace(f"{{{key}}}", str(value))
+                    agent_config["system_prompt"] = prompt
+                    print(f"   📝 Applied campaign variables: {list(campaign_variables.keys())}")
             else:
-                print(f"   ⚠️ Agent {agent_id} not found, using defaults")
+                print(f"   ⚠️ Agent {agent_id} not found in DB, using defaults")
         except Exception as e:
             print(f"   ⚠️ Error loading agent config: {e}")
     else:
-        print(f"   ℹ️ No agent_id provided, using default configuration")
+        print(f"   ⚠️ No agent_id provided and none found in active_calls, using defaults")
     
     # Agent-specific conversation history (not global!)
     agent_conversation_history = []
@@ -1484,18 +1526,34 @@ async def frejun_audio_ws(ws: WebSocket):
     # Import active_calls from frejun API
     from app.api.frejun import active_calls
     
-    # Create call record in database (with agent_id if available)
+    # Try to find the existing call record created by initiate_call()
+    # instead of creating a duplicate record
     call_id = None
     try:
-        call_record = call_service.create_call(
-            call_provider="frejun",
-            agent_id=agent_id  # Link call to specific agent
-        )
-        call_id = call_record.id
-        print(f"📞 FreJun call started with ID: {call_id}, Agent: {agent_config['agent_name']}")
-        # Note: We use agent_conversation_history instead of global reset_conversation()
+        # Look through active_calls to find the matching call's provider_call_id
+        matched_provider_call_id = None
+        for cid, cinfo in active_calls.items():
+            if cinfo.get("agent_id") == agent_id and cinfo.get("status") in ("initiated", "connected"):
+                matched_provider_call_id = cinfo.get("frejun_call_id", cid)
+                break
+        
+        if matched_provider_call_id:
+            # Look up existing call record by provider_call_id
+            existing_call = call_service.get_call_by_provider_id(matched_provider_call_id)
+            if existing_call:
+                call_id = existing_call.id
+                print(f"📞 FreJun WS linked to existing call: {call_id} (provider: {matched_provider_call_id}), Agent: {agent_config['agent_name']}")
+        
+        # If no existing record found (e.g., incoming call), create a new one
+        if not call_id:
+            call_record = call_service.create_call(
+                call_provider="frejun",
+                agent_id=agent_id
+            )
+            call_id = call_record.id
+            print(f"📞 FreJun call started with new ID: {call_id}, Agent: {agent_config['agent_name']}")
     except Exception as e:
-        print(f"⚠️ Could not create call record: {e}")
+        print(f"⚠️ Could not find/create call record: {e}")
     
     async def send_audio_to_frejun(audio_data: bytes):
         """Send audio chunk to FreJun for playback"""
@@ -1583,13 +1641,13 @@ async def frejun_audio_ws(ws: WebSocket):
                     
                     print(f"   🤖 LLM streaming for agent: {agent_config['agent_name']}...")
                     
-                    # MULTI-TENANT: Use agent-specific LLM function if agent has custom config
-                    from app.services.llm import ask_ai_streaming_for_agent, get_system_prompt
+                    # MULTI-TENANT: Use agent-specific LLM function (never fall back to agent_config.json)
+                    from app.services.llm import ask_ai_streaming_for_agent
                     
-                    # Get system prompt (agent-specific or default)
+                    # Get system prompt (agent-specific or generic default)
                     system_prompt = agent_config["system_prompt"]
                     if not system_prompt:
-                        system_prompt = get_system_prompt()  # Use default
+                        system_prompt = "You are a helpful AI voice assistant. Be concise and natural."
                     
                     for token in ask_ai_streaming_for_agent(
                         text=text,
@@ -1742,6 +1800,30 @@ async def frejun_audio_ws(ws: WebSocket):
                     print(f"📡 FreJun stream started: {stream_id}, sample_rate={sample_rate}")
                     print(f"   FreJun Call ID: {frejun_call_id}")
                     
+                    # If we don't have a linked call record yet, try to find it
+                    # now that we have the actual frejun_call_id from the stream
+                    if frejun_call_id and call_id:
+                        existing = call_service.get_call_by_provider_id(frejun_call_id)
+                        if existing and existing.id != call_id:
+                            # We created a duplicate earlier - use the original and 
+                            # clean up the duplicate if it has no data
+                            old_call_id = call_id
+                            call_id = existing.id
+                            print(f"   🔗 Re-linked to original call record: {call_id} (was: {old_call_id})")
+                            # Delete the orphan record we created
+                            try:
+                                from app.db.session import SessionLocal
+                                from app.db.models import Call
+                                db = SessionLocal()
+                                orphan = db.query(Call).filter(Call.id == old_call_id).first()
+                                if orphan and not orphan.end_time and not orphan.provider_call_id:
+                                    db.delete(orphan)
+                                    db.commit()
+                                    print(f"   🧹 Cleaned up orphan call record: {old_call_id}")
+                                db.close()
+                            except Exception:
+                                pass
+                    
                     # Try to get phone numbers from the stream data or active_calls
                     from_num = data.get("from") or data.get("from_number")
                     to_num = data.get("to") or data.get("to_number")
@@ -1755,8 +1837,9 @@ async def frejun_audio_ws(ws: WebSocket):
                                 print(f"   Found phone numbers from active_calls: {from_num} -> {to_num}")
                                 break
                     
-                    # Update database with phone numbers
-                    if call_id and (from_num or to_num):
+                    # Always update provider_call_id to the real FreJun call ID
+                    # so webhooks (call.completed, recording.completed) can find this record
+                    if call_id and frejun_call_id:
                         try:
                             call_service.update_call_phone_numbers(
                                 call_id,
@@ -1764,13 +1847,16 @@ async def frejun_audio_ws(ws: WebSocket):
                                 to_number=to_num,
                                 provider_call_id=frejun_call_id
                             )
+                            print(f"   🔗 Updated provider_call_id to: {frejun_call_id}")
                         except Exception as e:
-                            print(f"   ⚠️ Could not update phone numbers: {e}")
+                            print(f"   ⚠️ Could not update call record: {e}")
                     
-                    # Create recognizer for this call
-                    recognizer, audio_stream = create_streaming_recognizer(
-                        on_text_callback, 
-                        on_barge_in_callback,
+                    # Create recognizer for this call (use agent-specific language)
+                    from app.services.speech import create_streaming_recognizer_for_agent
+                    recognizer, audio_stream = create_streaming_recognizer_for_agent(
+                        recognition_language=agent_config["recognition_language"],
+                        on_text_callback=on_text_callback, 
+                        on_barge_in_callback=on_barge_in_callback,
                         sample_rate=sample_rate
                     )
                     
@@ -1781,12 +1867,33 @@ async def frejun_audio_ws(ws: WebSocket):
                         opening_start = time.time()
                         
                         opening_prompt = "START_CONVERSATION"
-                        opening_text = "".join([t for t in ask_ai_streaming(opening_prompt)])
+                        
+                        # MULTI-TENANT: Use agent-specific LLM and TTS (never fall back to agent_config.json)
+                        from app.services.llm import ask_ai_streaming_for_agent
+                        system_prompt = agent_config["system_prompt"]
+                        if not system_prompt:
+                            system_prompt = "You are a helpful AI voice assistant. Be concise and natural."
+                        
+                        opening_text = "".join([t for t in ask_ai_streaming_for_agent(
+                            text=opening_prompt,
+                            system_prompt=system_prompt,
+                            history=agent_conversation_history,
+                            kb_id=agent_config["kb_id"]
+                        )])
                         cleaned_opening = clean_llm_output(opening_text)
                         
                         if cleaned_opening:
-                            for sentence_audio in text_to_speech_telephony(cleaned_opening):
+                            for sentence_audio in text_to_speech_telephony_for_agent(
+                                cleaned_opening, agent_config["synthesis_voice"]
+                            ):
                                 await send_audio_to_frejun(sentence_audio)
+                            # Add opening to conversation history
+                            agent_conversation_history.append({"role": "assistant", "content": cleaned_opening})
+                            transcript.append({
+                                "role": "agent",
+                                "text": cleaned_opening,
+                                "timestamp": datetime.now().strftime("%H:%M:%S")
+                            })
                         
                         opening_time = (time.time() - opening_start) * 1000
                         print(f"📞 Opening sent: {opening_time:.0f}ms")

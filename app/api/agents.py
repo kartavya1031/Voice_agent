@@ -138,20 +138,50 @@ async def get_agent_voices():
     """Get supported recognition languages and synthesis voices"""
     return {
         "languages": [
-            {"code": "en-US", "name": "English (US)"},
             {"code": "en-IN", "name": "English (India)"},
+            {"code": "en-US", "name": "English (US)"},
+            {"code": "en-GB", "name": "English (UK)"},
             {"code": "hi-IN", "name": "Hindi (India)"},
-            {"code": "en-GB", "name": "English (UK)"}
+            {"code": "es-ES", "name": "Spanish (Spain)"},
+            {"code": "es-MX", "name": "Spanish (Mexico)"},
+            {"code": "fr-FR", "name": "French (France)"},
+            {"code": "de-DE", "name": "German (Germany)"},
+            {"code": "ja-JP", "name": "Japanese (Japan)"},
+            {"code": "zh-CN", "name": "Chinese (Mainland)"},
         ],
         "voices": [
-            {"shortName": "en-US-AvaNeural", "localName": "Ava", "locale": "en-US", "gender": "Female"},
-            {"shortName": "en-US-AndrewNeural", "localName": "Andrew", "locale": "en-US", "gender": "Male"},
+            # English - India
             {"shortName": "en-IN-NeerjaNeural", "localName": "Neerja", "locale": "en-IN", "gender": "Female"},
             {"shortName": "en-IN-PrabhatNeural", "localName": "Prabhat", "locale": "en-IN", "gender": "Male"},
+            # English - US
+            {"shortName": "en-US-JennyNeural", "localName": "Jenny", "locale": "en-US", "gender": "Female"},
+            {"shortName": "en-US-JennyMultilingualNeural", "localName": "Jenny Multilingual", "locale": "en-US", "gender": "Female"},
+            {"shortName": "en-US-GuyNeural", "localName": "Guy", "locale": "en-US", "gender": "Male"},
+            {"shortName": "en-US-AriaNeural", "localName": "Aria", "locale": "en-US", "gender": "Female"},
+            {"shortName": "en-US-DavisNeural", "localName": "Davis", "locale": "en-US", "gender": "Male"},
+            {"shortName": "en-US-JasonNeural", "localName": "Jason", "locale": "en-US", "gender": "Male"},
+            {"shortName": "en-US-SaraNeural", "localName": "Sara", "locale": "en-US", "gender": "Female"},
+            {"shortName": "en-US-AvaNeural", "localName": "Ava", "locale": "en-US", "gender": "Female"},
+            {"shortName": "en-US-AndrewNeural", "localName": "Andrew", "locale": "en-US", "gender": "Male"},
+            # English - UK
+            {"shortName": "en-GB-SoniaNeural", "localName": "Sonia", "locale": "en-GB", "gender": "Female"},
+            {"shortName": "en-GB-RyanNeural", "localName": "Ryan", "locale": "en-GB", "gender": "Male"},
+            # Hindi
             {"shortName": "hi-IN-SwaraNeural", "localName": "Swara", "locale": "hi-IN", "gender": "Female"},
             {"shortName": "hi-IN-MadhurNeural", "localName": "Madhur", "locale": "hi-IN", "gender": "Male"},
-            {"shortName": "en-GB-SoniaNeural", "localName": "Sonia", "locale": "en-GB", "gender": "Female"},
-            {"shortName": "en-GB-RyanNeural", "localName": "Ryan", "locale": "en-GB", "gender": "Male"}
+            {"shortName": "hi-IN-AartiNeural", "localName": "Aarti", "locale": "hi-IN", "gender": "Female"},
+            {"shortName": "hi-IN-KavyaNeural", "localName": "Kavya", "locale": "hi-IN", "gender": "Female"},
+            # Spanish
+            {"shortName": "es-ES-ElviraNeural", "localName": "Elvira", "locale": "es-ES", "gender": "Female"},
+            {"shortName": "es-MX-DaliaNeural", "localName": "Dalia", "locale": "es-MX", "gender": "Female"},
+            # French
+            {"shortName": "fr-FR-DeniseNeural", "localName": "Denise", "locale": "fr-FR", "gender": "Female"},
+            # German
+            {"shortName": "de-DE-KatjaNeural", "localName": "Katja", "locale": "de-DE", "gender": "Female"},
+            # Japanese
+            {"shortName": "ja-JP-NanamiNeural", "localName": "Nanami", "locale": "ja-JP", "gender": "Female"},
+            # Chinese
+            {"shortName": "zh-CN-XiaoxiaoNeural", "localName": "Xiaoxiao", "locale": "zh-CN", "gender": "Female"},
         ]
     }
 

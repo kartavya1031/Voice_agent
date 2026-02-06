@@ -235,10 +235,12 @@ async def handle_frejun_unified_webhook(request: Request):
                 
                 # If call completed, update duration and run sentiment analysis
                 if event == "call.completed":
-                    duration = data.get("duration")
-                    if duration and call_id:
+                    duration_ms = data.get("duration")
+                    if duration_ms and call_id:
+                        # FreJun reports duration in milliseconds, convert to seconds
+                        duration_seconds = int(duration_ms / 1000) if duration_ms > 1000 else duration_ms
                         from app.db.service import call_service
-                        call_service.end_call(call_id, "completed", duration)
+                        call_service.end_call(call_id, "completed", duration_seconds)
                     
                     # Trigger sentiment analysis
                     try:

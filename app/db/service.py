@@ -61,9 +61,13 @@ class CallService:
         db = SessionLocal()
         try:
             call = db.query(Call).filter(Call.id == call_id).first()
+            if not call:
+                # Try to find by provider_call_id (e.g., FreJun call ID from webhooks)
+                call = db.query(Call).filter(Call.provider_call_id == call_id).first()
             if call:
                 call.end_time = datetime.utcnow()
                 call.end_reason = end_reason
+                call.status = "completed"
                 if duration_seconds is not None:
                     call.duration_seconds = duration_seconds
                 elif call.start_time:
@@ -121,14 +125,27 @@ class CallService:
     
     @staticmethod
     def get_call_transcript(call_id: str) -> Optional[str]:
-        """Get the full transcript content for a call"""
+        """Get the full transcript content for a call (by internal ID or provider_call_id)"""
         db = SessionLocal()
         try:
+            # First try direct lookup by call_id
             transcript = db.query(CallTranscript).filter(
                 CallTranscript.call_id == call_id,
                 CallTranscript.speaker == "full"
             ).first()
-            return transcript.message if transcript else None
+            if transcript:
+                return transcript.message
+            
+            # If not found, resolve via provider_call_id and try again
+            call = db.query(Call).filter(Call.provider_call_id == call_id).first()
+            if call:
+                transcript = db.query(CallTranscript).filter(
+                    CallTranscript.call_id == call.id,
+                    CallTranscript.speaker == "full"
+                ).first()
+                return transcript.message if transcript else None
+            
+            return None
         finally:
             db.close()
     
