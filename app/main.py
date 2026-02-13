@@ -20,17 +20,22 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional, List
 
-# Global turn tracking for barge-in support
+# Global turn tracking for barge-in support (kept for FreJun handler backward compat)
 current_turn_id = 0
 current_turn_lock = threading.Lock()
 
-from app.services.llm import ask_ai, ask_ai_streaming, reset_conversation, add_to_conversation, clean_llm_output
+from app.services.llm import (
+    ask_ai, ask_ai_streaming, ask_ai_streaming_for_agent,
+    reset_conversation, add_to_conversation, clean_llm_output,
+)
 from app.services.speech import (
     text_to_speech,
     text_to_speech_streaming,
+    text_to_speech_streaming_for_agent,
     text_to_speech_telephony,
     text_to_speech_telephony_for_agent,
     create_streaming_recognizer,
+    create_streaming_recognizer_for_agent,
     update_speech_settings,
     get_current_speech_settings
 )
@@ -813,8 +818,17 @@ async def audio_ws(ws: WebSocket, agent_id: str = None, user_id: str = None):
     MULTI-TENANT: Accepts agent_id and user_id query parameters.
     - agent_id: Load agent-specific config (prompt, voice, KB)
     - user_id: Track which user initiated the call
+    
+    CONCURRENCY-SAFE: All state is per-connection. No global mutation.
+    Each WebSocket connection has its own:
+    - agent_config (prompt, voice, KB)
+    - conversation history
+    - turn tracking (for barge-in)
+    - STT recognizer
     """
-    global current_turn_id
+    # Per-call turn tracking (NOT global - allows concurrent calls)
+    call_turn_id = [0]
+    call_turn_lock = threading.Lock()
     
     # =========================================================================
     # MULTI-TENANT: Parse parameters from query string
@@ -885,34 +899,6 @@ async def audio_ws(ws: WebSocket, agent_id: str = None, user_id: str = None):
         )
         call_id = call_record.id
         print(f"📞 Browser call started with ID: {call_id}, Agent: {agent_config['agent_name']}, User: {user_id}")
-        
-        # MULTI-TENANT: Update global settings for this call based on agent config
-        # This ensures the existing LLM and TTS functions use agent-specific settings
-        if agent_id and agent_config["system_prompt"]:
-            from app.services.speech import update_speech_settings
-            from app.services.llm import set_system_prompt
-            from app.services.vector_store import set_active_knowledge_base
-            
-            # Update speech settings to use agent's voice
-            update_speech_settings(
-                recognition_language=agent_config["recognition_language"],
-                synthesis_voice=agent_config["synthesis_voice"]
-            )
-            
-            # Update LLM system prompt to use agent's prompt
-            set_system_prompt(agent_config["system_prompt"])
-            
-            # IMPORTANT: Set the active knowledge base for this agent
-            if agent_config["kb_id"]:
-                set_active_knowledge_base(agent_config["kb_id"])
-                print(f"   📚 Activated KB: {agent_config['kb_id']}")
-            
-            # Reset conversation with agent-specific settings
-            reset_conversation()
-            print(f"   ✅ Applied agent config: Voice={agent_config['synthesis_voice']}, KB={agent_config['kb_id']}")
-        elif not agent_id:
-            # Only reset global for backward compatibility if no agent specified
-            reset_conversation()
     except Exception as e:
         print(f"⚠️ Could not create call record: {e}")
     
@@ -921,7 +907,10 @@ async def audio_ws(ws: WebSocket, agent_id: str = None, user_id: str = None):
     # The agent should always start the conversation as per the system prompt
     # ==========================================================================
     async def send_opening_message():
-        """Generate and send the opening message from the agent based on system prompt."""
+        """Generate and send the opening message from the agent based on system prompt.
+        
+        CONCURRENCY-SAFE: Uses agent-specific LLM and TTS (no globals).
+        """
         nonlocal transcript
         
         opening_start = time.time()
@@ -938,14 +927,24 @@ async def audio_ws(ws: WebSocket, agent_id: str = None, user_id: str = None):
             agent_response = []
             
             def process_opening():
-                """Generate the opening message using LLM."""
+                """Generate the opening message using agent-specific LLM."""
                 try:
                     sentence_buffer = ""
                     sentence_end_pattern = re.compile(r'[.!?]\s*')
                     full_response = ""
                     tts_start = None
                     
-                    for token in ask_ai_streaming(opening_prompt):
+                    # MULTI-TENANT: Use agent-specific LLM function
+                    system_prompt = agent_config["system_prompt"]
+                    if not system_prompt:
+                        system_prompt = "You are a helpful AI voice assistant. Be concise and natural."
+                    
+                    for token in ask_ai_streaming_for_agent(
+                        text=opening_prompt,
+                        system_prompt=system_prompt,
+                        history=agent_conversation_history,
+                        kb_id=agent_config["kb_id"]
+                    ):
                         sentence_buffer += token
                         full_response += token
                         
@@ -960,7 +959,10 @@ async def audio_ws(ws: WebSocket, agent_id: str = None, user_id: str = None):
                                 if sentence:
                                     if tts_start is None:
                                         tts_start = time.time()
-                                    for audio_chunk in text_to_speech_streaming(sentence):
+                                    # MULTI-TENANT: Use agent-specific TTS voice
+                                    for audio_chunk in text_to_speech_streaming_for_agent(
+                                        sentence, agent_config["synthesis_voice"]
+                                    ):
                                         audio_queue.put(audio_chunk)
                     
                     # Handle remaining text
@@ -968,7 +970,9 @@ async def audio_ws(ws: WebSocket, agent_id: str = None, user_id: str = None):
                     if remaining:
                         remaining = clean_llm_output(remaining)
                         if remaining:
-                            for audio_chunk in text_to_speech_streaming(remaining):
+                            for audio_chunk in text_to_speech_streaming_for_agent(
+                                remaining, agent_config["synthesis_voice"]
+                            ):
                                 audio_queue.put(audio_chunk)
                     
                     cleaned_response = clean_llm_output(full_response)
@@ -1010,14 +1014,14 @@ async def audio_ws(ws: WebSocket, agent_id: str = None, user_id: str = None):
             
             is_agent_generating[0] = False
             
-            # Add to transcript and conversation history
+            # Add to transcript and per-call conversation history
             if agent_response:
                 transcript.append({
                     "role": "agent",
                     "text": agent_response[0],
                     "timestamp": datetime.now().strftime("%H:%M:%S")
                 })
-                add_to_conversation("assistant", agent_response[0])
+                agent_conversation_history.append({"role": "assistant", "content": agent_response[0]})
                 
         except Exception as e:
             print(f"❌ Opening error: {e}")
@@ -1060,7 +1064,11 @@ async def audio_ws(ws: WebSocket, agent_id: str = None, user_id: str = None):
                     break
 
     async def on_text(text: str, my_turn_id: int):
-        global current_turn_id
+        """Handle recognized speech from user.
+        
+        CONCURRENCY-SAFE: Uses per-call turn tracking, conversation history,
+        agent-specific LLM and TTS.
+        """
         nonlocal last_activity_time
         
         print("🧑 STT:", repr(text))
@@ -1077,8 +1085,8 @@ async def audio_ws(ws: WebSocket, agent_id: str = None, user_id: str = None):
             "timestamp": datetime.now().strftime("%H:%M:%S")
         })
         
-        # Add to conversation history for LLM context
-        add_to_conversation("user", text)
+        # MULTI-TENANT: Use per-call conversation history (not global)
+        agent_conversation_history.append({"role": "user", "content": text})
         
         # Check for end intent (simple keyword check first)
         if detect_end_intent_simple(text):
@@ -1094,7 +1102,9 @@ async def audio_ws(ws: WebSocket, agent_id: str = None, user_id: str = None):
             
             # Send goodbye audio
             try:
-                for audio_chunk in text_to_speech_streaming(goodbye_msg):
+                for audio_chunk in text_to_speech_streaming_for_agent(
+                    goodbye_msg, agent_config["synthesis_voice"]
+                ):
                     await ws.send_json({
                         "type": "audio_chunk",
                         "data": base64.b64encode(audio_chunk).decode()
@@ -1129,6 +1139,9 @@ async def audio_ws(ws: WebSocket, agent_id: str = None, user_id: str = None):
             def process_pipeline():
                 """Background thread: LLM → sentence detection → TTS → audio queue
                 
+                CONCURRENCY-SAFE: Uses agent-specific LLM and TTS (no globals).
+                Uses per-call turn tracking for barge-in.
+                
                 OPTIMIZATIONS v2:
                 1. Aggressive early flush: trigger on comma/semicolon after just 5 words
                 2. Split long sentences (>15 words) at natural break points
@@ -1146,11 +1159,21 @@ async def audio_ws(ws: WebSocket, agent_id: str = None, user_id: str = None):
                     token_count = [0]
                     words_since_flush = [0]
 
-                    print(f"   🤖 LLM streaming...")
+                    print(f"   🤖 LLM streaming for agent: {agent_config['agent_name']}...")
                     llm_start = time.time()
                     
-                    for token in ask_ai_streaming(text):
-                        if my_turn_id != current_turn_id:
+                    # MULTI-TENANT: Use agent-specific LLM function
+                    system_prompt = agent_config["system_prompt"]
+                    if not system_prompt:
+                        system_prompt = "You are a helpful AI voice assistant. Be concise and natural."
+                    
+                    for token in ask_ai_streaming_for_agent(
+                        text=text,
+                        system_prompt=system_prompt,
+                        history=agent_conversation_history,
+                        kb_id=agent_config["kb_id"]
+                    ):
+                        if my_turn_id != call_turn_id[0]:
                             print("⚡ BARGE-IN: LLM stopped")
                             return
                         
@@ -1193,8 +1216,11 @@ async def audio_ws(ws: WebSocket, agent_id: str = None, user_id: str = None):
                                 if not sentence:
                                     continue
                                 
-                                for audio_chunk in text_to_speech_streaming(sentence):
-                                    if my_turn_id != current_turn_id:
+                                # MULTI-TENANT: Use agent-specific TTS voice
+                                for audio_chunk in text_to_speech_streaming_for_agent(
+                                    sentence, agent_config["synthesis_voice"]
+                                ):
+                                    if my_turn_id != call_turn_id[0]:
                                         print("⚡ BARGE-IN: TTS stopped")
                                         return
                                     
@@ -1209,8 +1235,10 @@ async def audio_ws(ws: WebSocket, agent_id: str = None, user_id: str = None):
                     if remaining:
                         remaining = clean_llm_output(remaining)
                         if remaining:
-                            for audio_chunk in text_to_speech_streaming(remaining):
-                                if my_turn_id != current_turn_id:
+                            for audio_chunk in text_to_speech_streaming_for_agent(
+                                remaining, agent_config["synthesis_voice"]
+                            ):
+                                if my_turn_id != call_turn_id[0]:
                                     return
                                 if first_audio_time[0] is None:
                                     first_audio_time[0] = time.time()
@@ -1239,7 +1267,7 @@ async def audio_ws(ws: WebSocket, agent_id: str = None, user_id: str = None):
             chunk_count = 0
             first_chunk_sent = False
             while True:
-                if my_turn_id != current_turn_id:
+                if my_turn_id != call_turn_id[0]:
                     print("⚡ BARGE-IN: Stopping transmission")
                     try:
                         await ws.send_json({"type": "barge_in"})
@@ -1264,7 +1292,7 @@ async def audio_ws(ws: WebSocket, agent_id: str = None, user_id: str = None):
                     print(f"   ❌ WebSocket error: {e}")
                     break
             
-            if my_turn_id == current_turn_id:
+            if my_turn_id == call_turn_id[0]:
                 await ws.send_json({"type": "audio_end"})
                 audio_end_sent[0] = True
                 
@@ -1278,8 +1306,8 @@ async def audio_ws(ws: WebSocket, agent_id: str = None, user_id: str = None):
                         "timestamp": datetime.now().strftime("%H:%M:%S")
                     })
                     
-                    # Add to conversation history for LLM context
-                    add_to_conversation("assistant", agent_response[0])
+                    # MULTI-TENANT: Use per-call conversation history
+                    agent_conversation_history.append({"role": "assistant", "content": agent_response[0]})
                     
                     # Check if LLM response indicates end of conversation
                     if detect_end_intent_simple(agent_response[0]):
@@ -1298,21 +1326,20 @@ async def audio_ws(ws: WebSocket, agent_id: str = None, user_id: str = None):
             is_client_playing[0] = False
 
     def on_text_callback(text: str):
-        global current_turn_id
-        
-        with current_turn_lock:
-            current_turn_id += 1
-            my_turn_id = current_turn_id
+        """CONCURRENCY-SAFE: Uses per-call turn tracking."""
+        with call_turn_lock:
+            call_turn_id[0] += 1
+            my_turn_id = call_turn_id[0]
         
         asyncio.run_coroutine_threadsafe(on_text(text, my_turn_id), loop)
 
     def on_barge_in_callback():
-        """Called when STT detects partial speech - immediately interrupt TTS"""
-        global current_turn_id
-        
+        """Called when STT detects partial speech - immediately interrupt TTS.
+        CONCURRENCY-SAFE: Uses per-call turn tracking.
+        """
         if is_agent_generating[0] or is_client_playing[0]:
-            with current_turn_lock:
-                current_turn_id += 1
+            with call_turn_lock:
+                call_turn_id[0] += 1
             
             is_client_playing[0] = False
             print("⚡ BARGE-IN detected")
@@ -1325,7 +1352,13 @@ async def audio_ws(ws: WebSocket, agent_id: str = None, user_id: str = None):
             except Exception:
                 pass
 
-    recognizer, audio_stream = create_streaming_recognizer(on_text_callback, on_barge_in_callback)
+    # MULTI-TENANT: Use agent-specific STT recognizer
+    recognizer, audio_stream = create_streaming_recognizer_for_agent(
+        recognition_language=agent_config["recognition_language"],
+        on_text_callback=on_text_callback,
+        on_barge_in_callback=on_barge_in_callback,
+        sample_rate=16000
+    )
     
     # Start call limit monitor
     monitor_task = asyncio.create_task(monitor_call_limits())

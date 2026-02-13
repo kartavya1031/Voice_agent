@@ -51,8 +51,8 @@ class Agent(Base):
     name = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
     
-    # Phone number (unique per agent - for routing incoming calls)
-    phone_number = Column(String(20), unique=True, nullable=True, index=True)
+    # Phone number or SIP URI (unique per agent - for routing incoming calls)
+    phone_number = Column(String(100), unique=True, nullable=True, index=True)
     
     # Agent Behavior Configuration
     system_prompt = Column(Text, nullable=False)

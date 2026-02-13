@@ -156,6 +156,7 @@ def create_streaming_recognizer(on_text_callback, on_barge_in_callback=None, sam
 # =============================================================================
 _tts_cache = {}
 _tts_cache_max_size = 50  # Increased cache size for more phrases
+_tts_cache_lock = threading.Lock()  # Thread-safe cache access
 
 # Persistent synthesizer for connection reuse (reduces ~50-100ms per call)
 _synthesizer = None
@@ -232,6 +233,8 @@ def text_to_speech_streaming(text: str):
     """
     Synthesize full audio for text using SSML, then yield in consistent-sized chunks.
     Uses caching and connection pooling for optimal performance.
+    
+    LEGACY: Uses global voice settings. For multi-tenant, use text_to_speech_streaming_for_agent().
     """
     import time
     global _tts_cache
@@ -240,10 +243,12 @@ def text_to_speech_streaming(text: str):
     if len(text) > 120:
         text = text[:117] + "..."
     
-    # Check cache first
+    # Check cache first (thread-safe read)
     cache_key = text.lower().strip()
-    if cache_key in _tts_cache:
-        audio_data = _tts_cache[cache_key]
+    with _tts_cache_lock:
+        cached = _tts_cache.get(cache_key)
+    if cached is not None:
+        audio_data = cached
         chunk_size = 2048
         for i in range(0, len(audio_data), chunk_size):
             yield audio_data[i:i + chunk_size]
@@ -260,9 +265,11 @@ def text_to_speech_streaming(text: str):
         audio_data = result.audio_data
         synthesis_time = (time.time() - start_time) * 1000
         
-        # Cache for future use
-        if len(text) < 80 and len(_tts_cache) < _tts_cache_max_size:
-            _tts_cache[cache_key] = audio_data
+        # Cache for future use (thread-safe write)
+        if len(text) < 80:
+            with _tts_cache_lock:
+                if len(_tts_cache) < _tts_cache_max_size:
+                    _tts_cache[cache_key] = audio_data
         
         chunk_size = 2048
         for i in range(0, len(audio_data), chunk_size):
@@ -289,6 +296,7 @@ _telephony_synthesizer = None
 _telephony_synthesizer_voice = None
 _telephony_tts_cache = {}
 _telephony_tts_cache_max_size = 50
+_telephony_tts_cache_lock = threading.Lock()  # Thread-safe cache access
 _telephony_synthesizer_lock = threading.Lock()
 
 
@@ -346,10 +354,12 @@ def text_to_speech_telephony(text: str):
     if len(text) > 120:
         text = text[:117] + "..."
     
-    # Check cache first
+    # Check cache first (thread-safe read)
     cache_key = f"tel_{text.lower().strip()}"
-    if cache_key in _telephony_tts_cache:
-        audio_data = _telephony_tts_cache[cache_key]
+    with _telephony_tts_cache_lock:
+        cached = _telephony_tts_cache.get(cache_key)
+    if cached is not None:
+        audio_data = cached
         print(f"   📞 TTS cache hit (telephony)")
         chunk_size = 8000  # 500ms
         for i in range(0, len(audio_data), chunk_size):
@@ -368,9 +378,11 @@ def text_to_speech_telephony(text: str):
         synthesis_time = (time.time() - start_time) * 1000
         print(f"   📞 TTS (telephony): {len(audio_data)} bytes, {synthesis_time:.0f}ms")
         
-        # Cache for future use
-        if len(text) < 80 and len(_telephony_tts_cache) < _telephony_tts_cache_max_size:
-            _telephony_tts_cache[cache_key] = audio_data
+        # Cache for future use (thread-safe write)
+        if len(text) < 80:
+            with _telephony_tts_cache_lock:
+                if len(_telephony_tts_cache) < _telephony_tts_cache_max_size:
+                    _telephony_tts_cache[cache_key] = audio_data
         
         chunk_size = 8000  # 500ms of audio at 8kHz 16-bit (Recommended by FreJun)
         for i in range(0, len(audio_data), chunk_size):
@@ -613,3 +625,82 @@ def text_to_speech_telephony_for_agent(text: str, voice_name: str):
                 yield audio_data[i:i + chunk_size]
         else:
             raise Exception(f"Agent TTS failed: {result.reason}")
+
+
+def text_to_speech_streaming_for_agent(text: str, voice_name: str):
+    """
+    Synthesize audio for browser streaming using agent-specific voice at 16kHz.
+    
+    MULTI-TENANT VERSION: Creates a per-call synthesizer with the agent's voice
+    instead of using the global shared synthesizer. This allows concurrent calls
+    with different agents/voices without interference.
+    
+    Args:
+        text: Text to synthesize
+        voice_name: Agent's synthesis voice (e.g., 'en-IN-NeerjaNeural')
+    
+    Yields:
+        Audio chunks (2048 bytes) suitable for browser WebSocket streaming
+    """
+    import time
+    
+    # Truncate very long text
+    if len(text) > 120:
+        text = text[:117] + "..."
+    
+    # Check shared cache (voice-specific key for multi-tenant safety)
+    cache_key = f"{voice_name}:{text.lower().strip()}"
+    with _tts_cache_lock:
+        cached = _tts_cache.get(cache_key)
+    if cached is not None:
+        chunk_size = 2048
+        for i in range(0, len(cached), chunk_size):
+            yield cached[i:i + chunk_size]
+        return
+    
+    # Build SSML with agent's voice
+    ssml = _build_ssml(text, voice_name)
+    start_time = time.time()
+    
+    # Create synthesizer with agent's voice (not shared global)
+    config = speechsdk.SpeechConfig(
+        subscription=SPEECH_KEY,
+        region=SPEECH_REGION
+    )
+    config.speech_synthesis_voice_name = voice_name
+    config.set_speech_synthesis_output_format(
+        speechsdk.SpeechSynthesisOutputFormat.Raw16Khz16BitMonoPcm
+    )
+    
+    synthesizer = speechsdk.SpeechSynthesizer(
+        speech_config=config,
+        audio_config=None
+    )
+    
+    result = synthesizer.speak_ssml_async(ssml).get()
+    
+    if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+        audio_data = result.audio_data
+        synthesis_time = (time.time() - start_time) * 1000
+        print(f"   🔊 TTS (agent voice: {voice_name}): {len(audio_data)} bytes, {synthesis_time:.0f}ms")
+        
+        # Cache for future use (thread-safe, voice-specific key)
+        if len(text) < 80:
+            with _tts_cache_lock:
+                if len(_tts_cache) < _tts_cache_max_size:
+                    _tts_cache[cache_key] = audio_data
+        
+        chunk_size = 2048
+        for i in range(0, len(audio_data), chunk_size):
+            yield audio_data[i:i + chunk_size]
+    else:
+        print(f"❌ Agent browser TTS failed: {result.reason}")
+        # Fallback: try without SSML
+        result = synthesizer.speak_text_async(text).get()
+        if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+            audio_data = result.audio_data
+            chunk_size = 2048
+            for i in range(0, len(audio_data), chunk_size):
+                yield audio_data[i:i + chunk_size]
+        else:
+            raise Exception(f"Agent browser TTS failed: {result.reason}")

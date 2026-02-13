@@ -1,0 +1,1602 @@
+nohup: ignoring input
+INFO:     Will watch for changes in these directories: ['/root/project/Ai_Voice_Agent_Azure']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [318133] using WatchFiles
+Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+Failed to send telemetry event ClientCreateCollectionEvent: capture() takes 1 positional argument but 3 were given
+INFO:     Started server process [318141]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+✅ Knowledge base already loaded (40 chunks)
+✅ Database tables initialized (including multi-tenant tables)
+🗣️ Speech settings loaded: lang=hi-IN, voice=hi-IN-AartiNeural
+🔊 Pre-initializing Azure Speech services...
+   ✅ Regular TTS synthesizer (16kHz) ready
+   ✅ Telephony TTS synthesizer (8kHz) ready
+🔊 Speech services initialized in 303ms
+🔥 LLM connection pre-warmed!
+INFO:     127.0.0.1:57116 - "GET / HTTP/1.1" 200 OK
+INFO:     103.252.53.40:0 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     103.252.53.40:0 - "GET /api/frejun/config HTTP/1.1" 200 OK
+INFO:     103.252.53.40:0 - "GET /api/calls HTTP/1.1" 200 OK
+INFO:     103.252.53.40:0 - "GET /api/agents HTTP/1.1" 200 OK
+📞 Initiating FreJun call: +918065171340 → +919834292962
+   Flow URL: https://voice.anvenssa.com/api/frejun/flow/da01ce56
+📞 Call created in DB: 7278a87a-786f-4f07-916c-46ea042e3d44 (Agent: c0c15538-6f40-4076-9e97-1402694385c3)
+💾 Call saved to database with ID: 7278a87a-786f-4f07-916c-46ea042e3d44
+✅ FreJun call initiated: da01ce56 (FreJun ID: da01ce56)
+   To: +919834292962, From: +918065171340
+INFO:     103.252.53.40:0 - "POST /api/frejun/initiate-call HTTP/1.1" 200 OK
+📨 FreJun webhook: call.initiated
+   Data: {'call_id': '4b70d9c4-23aa-4ca6-bed2-2a5bd6e1774f', 'from': '+918065171340', 'to': '+919834292962', 'direction': 'outgoing', 'startTime': '2026-02-09T06:47:08.146Z'}
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+📞 Initiating FreJun call: +918065171340 → +919794602394
+   Flow URL: https://voice.anvenssa.com/api/frejun/flow/3dc59503
+❌ FreJun API error: 502 - {"detail":"Upstream error."}
+INFO:     152.58.16.75:0 - "POST /api/frejun/initiate-call HTTP/1.1" 200 OK
+📨 FreJun webhook: call.failed
+   Data: {'call_id': '1b21432f-21cf-49d7-bd5b-fa0f2ef53530', 'from': '+918065171340', 'to': '+919794602394', 'direction': 'outgoing'}
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+📋 FreJun requesting flow for call da01ce56 (POST)
+   Returning WebSocket URL: wss://voice.anvenssa.com/ws/frejun-audio?agent_id=c0c15538-6f40-4076-9e97-1402694385c3&user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f
+INFO:     13.202.4.3:0 - "POST /api/frejun/flow/da01ce56 HTTP/1.1" 200 OK
+📨 FreJun webhook: call.answered
+   Data: {'call_id': '4b70d9c4-23aa-4ca6-bed2-2a5bd6e1774f', 'from': '+918065171340', 'to': '+919834292962', 'direction': 'outgoing', 'startTime': '2026-02-09T06:47:08.146Z', 'answer_time': '2026-02-09T06:47:16.007Z'}
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+📨 FreJun webhook: stream.initiated
+   Data: {'call_id': '4b70d9c4-23aa-4ca6-bed2-2a5bd6e1774f', 'stream_id': 'd7fcfd41-7b57-4293-914d-fc5b263d5312', 'time': '2026-02-09T06:47:16.081Z'}
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+INFO:     ('13.202.4.3', 0) - "WebSocket /ws/frejun-audio?agent_id=c0c15538-6f40-4076-9e97-1402694385c3&user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f" [accepted]
+INFO:     connection open
+🔗 FreJun WebSocket connection attempt from: Address(host='13.202.4.3', port=0)
+   Headers: {'upgrade': 'websocket', 'connection': 'upgrade', 'host': 'voice.anvenssa.com', 'x-real-ip': '13.202.4.3', 'x-forwarded-for': '13.202.4.3', 'x-forwarded-proto': 'https', 'sec-websocket-version': '13', 'sec-websocket-key': 'PhadaezKo1xZpZfa7W2Phw==', 'sec-websocket-extensions': 'permessage-deflate; client_max_window_bits'}
+   🤖 Loading agent: Anvenssa Consultancy Pvt. Ltd  (ID: c0c15538-6f40-4076-9e97-1402694385c3)
+   📚 KB: f0becb58, Voice: en-US-SaraNeural
+🔗 FreJun WebSocket connected successfully
+📞 FreJun WS linked to existing call: 7278a87a-786f-4f07-916c-46ea042e3d44 (provider: da01ce56), Agent: Anvenssa Consultancy Pvt. Ltd 
+📡 FreJun stream started: d7fcfd41-7b57-4293-914d-fc5b263d5312, sample_rate=8000
+   FreJun Call ID: 4b70d9c4-23aa-4ca6-bed2-2a5bd6e1774f
+📞 Call phone numbers updated: 7278a87a-786f-4f07-916c-46ea042e3d44 -> None -> None
+   🔗 Updated provider_call_id to: 4b70d9c4-23aa-4ca6-bed2-2a5bd6e1774f
+🎤 Sending FreJun opening message...
+   🔍 Searching agent KB: f0becb58
+   🔍 Searching KB by ID: f0becb58 (collection: kb_f0becb58)
+   📊 Collection has 0 chunks
+   ⚠️ KB collection is empty
+   📭 No relevant context found in agent KB (13ms)
+   📞 TTS (agent voice: en-US-SaraNeural): 137064 bytes, 1054ms
+📞 Opening sent: 3072ms
+📞 Initiating FreJun call: +918065171340 → +919794602394
+   Flow URL: https://voice.anvenssa.com/api/frejun/flow/e7e99e7c
+❌ FreJun API error: 502 - {"detail":"Upstream error."}
+INFO:     152.58.16.75:0 - "POST /api/frejun/initiate-call HTTP/1.1" 200 OK
+📨 FreJun webhook: call.failed
+   Data: {'call_id': 'c38313d4-2da0-4d7a-9a07-0c75a1484dca', 'from': '+918065171340', 'to': '+919794602394', 'direction': 'outgoing'}
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+INFO:     152.58.16.75:0 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     152.58.16.75:0 - "GET /api/calls HTTP/1.1" 200 OK
+INFO:     152.58.16.75:0 - "GET /api/frejun/config HTTP/1.1" 200 OK
+INFO:     152.58.16.75:0 - "GET /api/agents HTTP/1.1" 200 OK
+📞 Initiating FreJun call: +918065171340 → +919794602394
+   Flow URL: https://voice.anvenssa.com/api/frejun/flow/464b505f
+🧑 STT: ''
+❌ FreJun API error: 502 - {"detail":"Upstream error."}
+INFO:     152.58.16.75:0 - "POST /api/frejun/initiate-call HTTP/1.1" 200 OK
+📨 FreJun webhook: call.failed
+   Data: {'call_id': '3f30070c-0cdf-4796-828f-285d55a04907', 'from': '+918065171340', 'to': '+919794602394', 'direction': 'outgoing'}
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+🧑 STT: 'Hello.'
+   🤖 LLM streaming for agent: Anvenssa Consultancy Pvt. Ltd ...
+   ⏩ Skipping RAG (simple query)
+   📞 TTS (agent voice: en-US-SaraNeural): 37486 bytes, 497ms
+   📊 TIMING: Total=1196ms
+📞 Initiating FreJun call: +918065171340 → +919794602394
+   Flow URL: https://voice.anvenssa.com/api/frejun/flow/cef55984
+❌ FreJun API error: 502 - {"detail":"Upstream error."}
+INFO:     152.58.16.75:0 - "POST /api/frejun/initiate-call HTTP/1.1" 200 OK
+📨 FreJun webhook: call.failed
+   Data: {'call_id': '756d21c6-ccbc-487a-8ca4-15e49bd4a54d', 'from': '+918065171340', 'to': '+919794602394', 'direction': 'outgoing'}
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+INFO:     connection closed
+🧑 STT: ''
+❌ FreJun WebSocket error: (<CloseCode.NO_STATUS_RCVD: 1005>, None)
+💾 Full transcript saved to database for call: 7278a87a-786f-4f07-916c-46ea042e3d44
+📴 Call ended in DB: 7278a87a-786f-4f07-916c-46ea042e3d44 - Reason: unknown
+💾 Transcript saved to database: 7278a87a-786f-4f07-916c-46ea042e3d44
+🎯 Starting sentiment analysis for call 7278a87a-786f-4f07-916c-46ea042e3d44...
+🎯 Sentiment Analysis Complete: Unclear
+💾 Sentiment saved for call 7278a87a-786f-4f07-916c-46ea042e3d44: Unclear
+📞 FreJun call ended. Duration: 37.2s, Reason: None
+🧑 STT: ''
+📨 FreJun webhook: stream.completed
+   Data: {'call_id': '4b70d9c4-23aa-4ca6-bed2-2a5bd6e1774f', 'stream_id': 'd7fcfd41-7b57-4293-914d-fc5b263d5312', 'time': '2026-02-09T06:47:53.285Z'}
+📊 Call status updated: 7278a87a-786f-4f07-916c-46ea042e3d44 -> stream_completed
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+📨 FreJun webhook: call.completed
+   Data: {'call_id': '4b70d9c4-23aa-4ca6-bed2-2a5bd6e1774f', 'from': '+918065171340', 'to': '+919834292962', 'direction': 'outgoing', 'startTime': '2026-02-09T06:47:08.146Z', 'answer_time': '2026-02-09T06:47:16.007Z', 'hangup_time': '2026-02-09T06:47:53.227Z', 'duration': 37220}
+📊 Call status updated: 7278a87a-786f-4f07-916c-46ea042e3d44 -> completed
+📞 Call phone numbers updated: 7278a87a-786f-4f07-916c-46ea042e3d44 -> +918065171340 -> +919834292962
+📴 Call ended in DB: 7278a87a-786f-4f07-916c-46ea042e3d44 - Reason: completed
+   🎯 Running sentiment analysis for call 4b70d9c4-23aa-4ca6-bed2-2a5bd6e1774f...
+🎯 Sentiment Analysis Complete: Unclear
+💾 Sentiment saved for call 7278a87a-786f-4f07-916c-46ea042e3d44: Unclear
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+📨 FreJun webhook: recording.completed
+   Data: {'call_id': '4b70d9c4-23aa-4ca6-bed2-2a5bd6e1774f', 'recording_id': 'd4723e31-9928-47a8-bf4f-79547ed1a208', 'recording_url': 'https://api.frejun.ai/api/v1/recordings/?recording_id=d4723e31-9928-47a8-bf4f-79547ed1a208'}
+🎙️ Call recording updated: 7278a87a-786f-4f07-916c-46ea042e3d44
+   💾 Recording URL saved: https://api.frejun.ai/api/v1/recordings/?recording...
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+INFO:     103.252.53.40:0 - "GET /api/calls/history?user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f HTTP/1.1" 200 OK
+INFO:     103.252.53.40:0 - "GET /api/calls/7278a87a-786f-4f07-916c-46ea042e3d44 HTTP/1.1" 200 OK
+INFO:     103.252.53.40:0 - "GET /api/calls HTTP/1.1" 200 OK
+INFO:     103.252.53.40:0 - "GET /api/calls/history?user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f HTTP/1.1" 200 OK
+INFO:     103.252.53.40:0 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     103.252.53.40:0 - "GET /api/calls HTTP/1.1" 200 OK
+INFO:     103.252.53.40:0 - "GET /api/frejun/config HTTP/1.1" 200 OK
+INFO:     103.252.53.40:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     ('103.252.53.40', 0) - "WebSocket /ws/audio?agent_id=c0c15538-6f40-4076-9e97-1402694385c3&user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f" [accepted]
+INFO:     connection open
+INFO:     ('152.58.16.75', 0) - "WebSocket /ws/audio?agent_id=c0c15538-6f40-4076-9e97-1402694385c3&user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f" [accepted]
+INFO:     connection open
+INFO:     connection closed
+   🤖 Browser call - Loading agent: Anvenssa Consultancy Pvt. Ltd  (ID: c0c15538-6f40-4076-9e97-1402694385c3)
+   📚 KB: f0becb58, Voice: en-US-SaraNeural
+🔗 Browser WebSocket connected (Agent: Anvenssa Consultancy Pvt. Ltd )
+📞 Call created in DB: 10c49e5f-0e6b-413b-a6d7-978ec5982768 (Agent: c0c15538-6f40-4076-9e97-1402694385c3)
+📞 Browser call started with ID: 10c49e5f-0e6b-413b-a6d7-978ec5982768, Agent: Anvenssa Consultancy Pvt. Ltd , User: 9a77c5d4-980a-4d5f-8f6d-376459d8b13f
+   🔍 Searching agent KB: f0becb58
+   🔍 Searching KB by ID: f0becb58 (collection: kb_f0becb58)
+   📊 Collection has 0 chunks
+   ⚠️ KB collection is empty
+   📭 No relevant context found in agent KB (9ms)
+   🔊 TTS (agent voice: en-US-SaraNeural): 44872 bytes, 615ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 131870 bytes, 394ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 84522 bytes, 276ms
+📞 OPENING: 3490ms total
+   🤖 Browser call - Loading agent: Anvenssa Consultancy Pvt. Ltd  (ID: c0c15538-6f40-4076-9e97-1402694385c3)
+   📚 KB: f0becb58, Voice: en-US-SaraNeural
+🔗 Browser WebSocket connected (Agent: Anvenssa Consultancy Pvt. Ltd )
+📞 Call created in DB: 9a50df9d-4976-4609-8fc5-5f0d31419af5 (Agent: c0c15538-6f40-4076-9e97-1402694385c3)
+📞 Browser call started with ID: 9a50df9d-4976-4609-8fc5-5f0d31419af5, Agent: Anvenssa Consultancy Pvt. Ltd , User: 9a77c5d4-980a-4d5f-8f6d-376459d8b13f
+   🔍 Searching agent KB: f0becb58
+   🔍 Searching KB by ID: f0becb58 (collection: kb_f0becb58)
+   📊 Collection has 0 chunks
+   ⚠️ KB collection is empty
+   📭 No relevant context found in agent KB (3ms)
+   🔊 TTS (agent voice: en-US-SaraNeural): 131870 bytes, 298ms
+📞 OPENING: 1185ms total
+🧑 STT: ''
+   🎤 User speaking: "can you..."
+⚡ BARGE-IN detected
+🧑 STT: ''
+   🔈 Client playback complete - silence timer started (20s)
+   🎤 User speaking: "yes..."
+   🎤 User speaking: "yeah can..."
+   🎤 User speaking: "yeah can you tell..."
+   🎤 User speaking: "yes can you give me inform..."
+   🎤 User speaking: "yeah can you tell me the name..."
+   🎤 User speaking: "yeah can you tell me the name ..."
+   🎤 User speaking: "yes can you give me informatio..."
+   🎤 User speaking: "yeah can you tell me the name ..."
+🧑 STT: 'Yes. Can you give me information about leadership team?'
+🔄 Starting processing...
+   🤖 LLM streaming for agent: Anvenssa Consultancy Pvt. Ltd ...
+   🔍 Searching agent KB: f0becb58
+   🔍 Searching KB by ID: f0becb58 (collection: kb_f0becb58)
+   📊 Collection has 0 chunks
+   ⚠️ KB collection is empty
+   📭 No relevant context found in agent KB (4ms)
+   ⚡ TTFT: 1041ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 53602 bytes, 300ms
+   🔊 First audio: 1346ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 161940 bytes, 343ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 147212 bytes, 339ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 138782 bytes, 278ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 221698 bytes, 366ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 42810 bytes, 149ms
+   📊 TIMING: LLM=3034ms | Tokens=64 | Total=3035ms
+   ⏳ Silence: 5s / 20s
+🧑 STT: 'Yeah. Can you tell me the name of the leadership team?'
+🔄 Starting processing...
+   🤖 LLM streaming for agent: Anvenssa Consultancy Pvt. Ltd ...
+   🔍 Searching agent KB: f0becb58
+   🔍 Searching KB by ID: f0becb58 (collection: kb_f0becb58)
+   📊 Collection has 0 chunks
+   ⚠️ KB collection is empty
+   📭 No relevant context found in agent KB (3ms)
+   ⚡ TTFT: 939ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 113386 bytes, 239ms
+   🔊 First audio: 1189ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 97618 bytes, 233ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 93594 bytes, 212ms
+   📊 TIMING: LLM=1733ms | Tokens=33 | Total=1734ms
+❌ WebSocket error: (<CloseCode.NO_STATUS_RCVD: 1005>, None)
+💾 Full transcript saved to database for call: 10c49e5f-0e6b-413b-a6d7-978ec5982768
+📴 Call ended in DB: 10c49e5f-0e6b-413b-a6d7-978ec5982768 - Reason: unknown
+💾 Transcript saved to database: 10c49e5f-0e6b-413b-a6d7-978ec5982768
+🎯 Starting sentiment analysis for call 10c49e5f-0e6b-413b-a6d7-978ec5982768...
+🎯 Sentiment Analysis Complete: Needs Info
+💾 Sentiment saved for call 10c49e5f-0e6b-413b-a6d7-978ec5982768: Needs Info
+📞 Call ended. Duration: 26.9s, Reason: None
+🧑 STT: ''
+INFO:     103.252.53.40:0 - "GET /api/calls HTTP/1.1" 200 OK
+   🔈 Client playback complete - silence timer started (20s)
+   🎤 User speaking: "i want to..."
+   🎤 User speaking: "i want to get the contact..."
+   🎤 User speaking: "i want to get the contact info..."
+🧑 STT: 'I want to get the contact information of the sales team.'
+🔄 Starting processing...
+   🤖 LLM streaming for agent: Anvenssa Consultancy Pvt. Ltd ...
+   🔍 Searching agent KB: f0becb58
+   🔍 Searching KB by ID: f0becb58 (collection: kb_f0becb58)
+   📊 Collection has 0 chunks
+   ⚠️ KB collection is empty
+   📭 No relevant context found in agent KB (4ms)
+   ⚡ TTFT: 876ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 123624 bytes, 384ms
+   🔊 First audio: 1271ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 188018 bytes, 295ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 96482 bytes, 225ms
+   📊 TIMING: LLM=1896ms | Tokens=31 | Total=1896ms
+   🔈 Client playback complete - silence timer started (20s)
+   🎤 User speaking: "no..."
+   🎤 User speaking: "no thank you that's it..."
+🧑 STT: "No, thank you. That's it."
+👋 End intent detected (keyword match)
+   🔊 TTS (agent voice: en-US-SaraNeural): 101096 bytes, 344ms
+💾 Full transcript saved to database for call: 9a50df9d-4976-4609-8fc5-5f0d31419af5
+📴 Call ended in DB: 9a50df9d-4976-4609-8fc5-5f0d31419af5 - Reason: user_intent
+💾 Transcript saved to database: 9a50df9d-4976-4609-8fc5-5f0d31419af5
+🎯 Starting sentiment analysis for call 9a50df9d-4976-4609-8fc5-5f0d31419af5...
+🎯 Sentiment Analysis Complete: Interested
+💾 Sentiment saved for call 9a50df9d-4976-4609-8fc5-5f0d31419af5: Interested
+📞 Call ended. Duration: 45.1s, Reason: user_intent
+INFO:     152.58.16.75:0 - "GET /api/calls HTTP/1.1" 200 OK
+INFO:     connection closed
+INFO:     152.58.16.75:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     152.58.16.75:0 - "GET /api/calls/history?user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f HTTP/1.1" 200 OK
+INFO:     152.58.16.75:0 - "GET /api/calls/10c49e5f-0e6b-413b-a6d7-978ec5982768 HTTP/1.1" 200 OK
+INFO:     103.252.53.40:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     103.252.53.40:0 - "GET /api/calls/history?user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f HTTP/1.1" 200 OK
+INFO:     103.252.53.40:0 - "GET /api/calls/10c49e5f-0e6b-413b-a6d7-978ec5982768 HTTP/1.1" 200 OK
+INFO:     152.58.16.75:0 - "GET /api/calls/9a50df9d-4976-4609-8fc5-5f0d31419af5 HTTP/1.1" 200 OK
+INFO:     152.58.16.75:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     152.58.16.75:0 - "GET /api/calls/history?user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f HTTP/1.1" 200 OK
+INFO:     152.58.16.75:0 - "GET /api/calls/history?user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f HTTP/1.1" 200 OK
+INFO:     152.58.16.75:0 - "GET /api/calls/14a01901-1ede-4931-9a85-ef5202fc77dc/recording HTTP/1.1" 200 OK
+INFO:     152.58.16.75:0 - "GET /api/calls/aae3a770-2093-4ff7-ac22-f8f820ff08d1/recording HTTP/1.1" 200 OK
+INFO:     152.58.16.75:0 - "GET /api/calls/7278a87a-786f-4f07-916c-46ea042e3d44/recording HTTP/1.1" 200 OK
+INFO:     ('152.58.16.75', 0) - "WebSocket /ws/audio?agent_id=74d442e0-60fd-47bf-93ef-b36d5eb0339c&user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f" [accepted]
+INFO:     connection open
+INFO:     ('103.252.53.40', 0) - "WebSocket /ws/audio?agent_id=c0c15538-6f40-4076-9e97-1402694385c3&user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f" [accepted]
+INFO:     connection open
+INFO:     connection closed
+   🤖 Browser call - Loading agent: Juztcalls Agent (ID: 74d442e0-60fd-47bf-93ef-b36d5eb0339c)
+   📚 KB: None, Voice: en-US-SaraNeural
+🔗 Browser WebSocket connected (Agent: Juztcalls Agent)
+📞 Call created in DB: b1ffcc46-8dee-4d01-a745-83d297ad5207 (Agent: 74d442e0-60fd-47bf-93ef-b36d5eb0339c)
+📞 Browser call started with ID: b1ffcc46-8dee-4d01-a745-83d297ad5207, Agent: Juztcalls Agent, User: 9a77c5d4-980a-4d5f-8f6d-376459d8b13f
+   🔊 TTS (agent voice: en-US-SaraNeural): 175422 bytes, 679ms
+📞 OPENING: 3137ms total
+   🤖 Browser call - Loading agent: Anvenssa Consultancy Pvt. Ltd  (ID: c0c15538-6f40-4076-9e97-1402694385c3)
+   📚 KB: f0becb58, Voice: en-US-SaraNeural
+🔗 Browser WebSocket connected (Agent: Anvenssa Consultancy Pvt. Ltd )
+📞 Call created in DB: 20cae61c-e7d6-450f-bd94-dc0c9813509a (Agent: c0c15538-6f40-4076-9e97-1402694385c3)
+📞 Browser call started with ID: 20cae61c-e7d6-450f-bd94-dc0c9813509a, Agent: Anvenssa Consultancy Pvt. Ltd , User: 9a77c5d4-980a-4d5f-8f6d-376459d8b13f
+   🔍 Searching agent KB: f0becb58
+   🔍 Searching KB by ID: f0becb58 (collection: kb_f0becb58)
+   📊 Collection has 0 chunks
+   ⚠️ KB collection is empty
+   📭 No relevant context found in agent KB (10ms)
+   🔊 TTS (agent voice: en-US-SaraNeural): 131940 bytes, 391ms
+📞 OPENING: 1314ms total
+   🎤 User speaking: "hello..."
+⚡ BARGE-IN detected
+🧑 STT: 'Hello.'
+🔄 Starting processing...
+   🤖 LLM streaming for agent: Anvenssa Consultancy Pvt. Ltd ...
+   ⏩ Skipping RAG (simple query)
+   ⚡ TTFT: 605ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 74972 bytes, 230ms
+   🔊 First audio: 845ms
+   📊 TIMING: LLM=871ms | Tokens=7 | Total=871ms
+   🔈 Client playback complete - silence timer started (20s)
+   🎤 User speaking: "so i..."
+   🔈 Client playback complete - silence timer started (20s)
+   🎤 User speaking: "so i have seen your..."
+   🎤 User speaking: "so i have seen your ad on amaz..."
+🧑 STT: 'So I have seen your ad on Amazon.'
+🔄 Starting processing...
+   🤖 LLM streaming for agent: Juztcalls Agent...
+   ⚡ TTFT: 938ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 68446 bytes, 176ms
+   🔊 First audio: 1118ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 47758 bytes, 198ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 207272 bytes, 591ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 104658 bytes, 360ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 116616 bytes, 270ms
+   📊 TIMING: LLM=2708ms | Tokens=47 | Total=2709ms
+   🎤 User speaking: "oh can..."
+   🎤 User speaking: "can you say me about..."
+   🎤 User speaking: "can you say me about ai sales ..."
+🧑 STT: 'Can you say me about AI sales agent?'
+🔄 Starting processing...
+   🤖 LLM streaming for agent: Anvenssa Consultancy Pvt. Ltd ...
+   🔍 Searching agent KB: f0becb58
+   🔍 Searching KB by ID: f0becb58 (collection: kb_f0becb58)
+   📊 Collection has 0 chunks
+   ⚠️ KB collection is empty
+   📭 No relevant context found in agent KB (3ms)
+   ⚡ TTFT: 935ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 109606 bytes, 225ms
+   🔊 First audio: 1181ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 166574 bytes, 283ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 187324 bytes, 417ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 124106 bytes, 218ms
+   📊 TIMING: LLM=2228ms | Tokens=45 | Total=2229ms
+   🎤 User speaking: "just a second..."
+⚡ BARGE-IN detected
+   🎤 User speaking: "just a second just..."
+   🎤 User speaking: "just a second just a second wa..."
+   🎤 User speaking: "just a second just a second wa..."
+   🎤 User speaking: "just a second just a second wa..."
+   🎤 User speaking: "just a second just a second wa..."
+🧑 STT: ''
+   🎤 User speaking: "just a second just a second wa..."
+   🎤 User speaking: "just a second just a second wa..."
+🧑 STT: 'Just a second, just a second. Wait, wait, wait, wait, wait. Who is your Vipin Ramakrishna?'
+🔄 Starting processing...
+   🤖 LLM streaming for agent: Anvenssa Consultancy Pvt. Ltd ...
+   🔍 Searching agent KB: f0becb58
+   🔍 Searching KB by ID: f0becb58 (collection: kb_f0becb58)
+   📊 Collection has 0 chunks
+   ⚠️ KB collection is empty
+   📭 No relevant context found in agent KB (3ms)
+   ⚡ TTFT: 834ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 147608 bytes, 444ms
+   🔊 First audio: 1292ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 184076 bytes, 370ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 84110 bytes, 290ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 185126 bytes, 527ms
+   📊 TIMING: LLM=2636ms | Tokens=49 | Total=2636ms
+   🔈 Client playback complete - silence timer started (20s)
+   🎤 User speaking: "uh..."
+🧑 STT: 'Uh, ya, I have.'
+🔄 Starting processing...
+   🤖 LLM streaming for agent: Juztcalls Agent...
+   ⚡ TTFT: 655ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 135650 bytes, 317ms
+   🔊 First audio: 986ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 117850 bytes, 262ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 151974 bytes, 386ms
+   📊 TIMING: LLM=1733ms | Tokens=38 | Total=1733ms
+   🎤 User speaking: "what..."
+⚡ BARGE-IN detected
+🧑 STT: 'What is the RAG agent?'
+🔄 Starting processing...
+   🤖 LLM streaming for agent: Anvenssa Consultancy Pvt. Ltd ...
+   🔍 Searching agent KB: f0becb58
+   🔍 Searching KB by ID: f0becb58 (collection: kb_f0becb58)
+   📊 Collection has 0 chunks
+   ⚠️ KB collection is empty
+   📭 No relevant context found in agent KB (3ms)
+   ⚡ TTFT: 1157ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 110500 bytes, 253ms
+   🔊 First audio: 1420ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 135650 bytes, 301ms
+   📊 TIMING: LLM=1783ms | Tokens=23 | Total=1783ms
+   🎤 User speaking: "what..."
+⚡ BARGE-IN detected
+   🎤 User speaking: "what are the required document..."
+🧑 STT: 'What are the required documents?'
+🔄 Starting processing...
+   🤖 LLM streaming for agent: Juztcalls Agent...
+   ⚡ TTFT: 907ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 56074 bytes, 351ms
+   🔊 First audio: 1263ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 132762 bytes, 282ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 196410 bytes, 478ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 67550 bytes, 226ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 89882 bytes, 249ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 101428 bytes, 477ms
+   📊 TIMING: LLM=3170ms | Tokens=52 | Total=3170ms
+   🎤 User speaking: "to a HR..."
+⚡ BARGE-IN detected
+🧑 STT: 'To a HRAHR dot.'
+🔄 Starting processing...
+   🤖 LLM streaming for agent: Anvenssa Consultancy Pvt. Ltd ...
+   🔍 Searching agent KB: f0becb58
+   🔍 Searching KB by ID: f0becb58 (collection: kb_f0becb58)
+   📊 Collection has 0 chunks
+   ⚠️ KB collection is empty
+   📭 No relevant context found in agent KB (5ms)
+   ⚡ TTFT: 1061ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 99778 bytes, 282ms
+   🔊 First audio: 1349ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 104726 bytes, 450ms
+   📊 TIMING: LLM=1861ms | Tokens=21 | Total=1862ms
+❌ WebSocket error: (<CloseCode.NO_STATUS_RCVD: 1005>, None)
+💾 Full transcript saved to database for call: b1ffcc46-8dee-4d01-a745-83d297ad5207
+📴 Call ended in DB: b1ffcc46-8dee-4d01-a745-83d297ad5207 - Reason: unknown
+💾 Transcript saved to database: b1ffcc46-8dee-4d01-a745-83d297ad5207
+🎯 Starting sentiment analysis for call b1ffcc46-8dee-4d01-a745-83d297ad5207...
+🎯 Sentiment Analysis Complete: Interested
+💾 Sentiment saved for call b1ffcc46-8dee-4d01-a745-83d297ad5207: Interested
+📞 Call ended. Duration: 47.2s, Reason: None
+INFO:     152.58.16.75:0 - "GET /api/calls HTTP/1.1" 200 OK
+🧑 STT: ''
+INFO:     152.58.16.75:0 - "GET /api/calls/history?user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f HTTP/1.1" 200 OK
+INFO:     connection closed
+   🎤 User speaking: "a IR chat..."
+⚡ BARGE-IN detected
+🧑 STT: 'A IR chat bot.'
+🔄 Starting processing...
+   🤖 LLM streaming for agent: Anvenssa Consultancy Pvt. Ltd ...
+   🔍 Searching agent KB: f0becb58
+   🔍 Searching KB by ID: f0becb58 (collection: kb_f0becb58)
+   📊 Collection has 0 chunks
+   ⚠️ KB collection is empty
+   📭 No relevant context found in agent KB (5ms)
+   ⚡ TTFT: 1042ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 111668 bytes, 318ms
+   🔊 First audio: 1377ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 222128 bytes, 421ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 192188 bytes, 379ms
+   🔊 TTS (agent voice: en-US-SaraNeural): 126580 bytes, 253ms
+   📊 TIMING: LLM=2583ms | Tokens=50 | Total=2584ms
+❌ WebSocket error: (<CloseCode.NO_STATUS_RCVD: 1005>, None)
+💾 Full transcript saved to database for call: 20cae61c-e7d6-450f-bd94-dc0c9813509a
+📴 Call ended in DB: 20cae61c-e7d6-450f-bd94-dc0c9813509a - Reason: unknown
+💾 Transcript saved to database: 20cae61c-e7d6-450f-bd94-dc0c9813509a
+🎯 Starting sentiment analysis for call 20cae61c-e7d6-450f-bd94-dc0c9813509a...
+🎯 Sentiment Analysis Complete: Needs Info
+💾 Sentiment saved for call 20cae61c-e7d6-450f-bd94-dc0c9813509a: Needs Info
+📞 Call ended. Duration: 50.6s, Reason: None
+INFO:     103.252.53.40:0 - "GET /api/calls HTTP/1.1" 200 OK
+🧑 STT: ''
+INFO:     184.105.139.69:16412 - "GET / HTTP/1.1" 200 OK
+INFO:     184.105.139.73:29081 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     184.105.139.85:46685 - "GET /?format=json HTTP/1.1" 200 OK
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+WARNING:  Invalid HTTP request received.
+INFO:     117.222.60.113:0 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "GET /api/frejun/config HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "GET /api/calls HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "GET /api/agent/voices HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "GET /api/agent/prompt-variables HTTP/1.1" 200 OK
+✅ Agent created: Varsha_Test (org: Test Organization 2)
+INFO:     117.222.60.113:0 - "POST /api/agents HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "GET /api/calls/history?user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "GET /api/agent/voices HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "GET /api/agents/10e368bd-e45b-493e-bb0d-5bd0f689b051 HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "GET /api/agent/prompt-variables HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "GET /api/agents/10e368bd-e45b-493e-bb0d-5bd0f689b051/knowledge-bases HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "GET /api/frejun/config HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "GET /api/calls HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     117.222.60.113:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     152.58.16.75:0 - "GET /api/frejun/config HTTP/1.1" 200 OK
+INFO:     152.58.16.75:0 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     152.58.16.75:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     152.58.16.75:0 - "GET /api/calls HTTP/1.1" 200 OK
+INFO:     178.128.253.129:45946 - "GET / HTTP/1.1" 200 OK
+INFO:     178.128.253.129:45956 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     182.95.174.34:0 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     121.241.75.242:0 - "GET /api/calls HTTP/1.1" 200 OK
+INFO:     182.95.174.34:0 - "GET /api/frejun/config HTTP/1.1" 200 OK
+INFO:     121.241.75.242:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     45.194.92.38:57016 - "POST / HTTP/1.1" 405 Method Not Allowed
+INFO:     45.194.92.38:59454 - "POST /_next HTTP/1.1" 404 Not Found
+INFO:     45.194.92.38:59466 - "POST /api HTTP/1.1" 404 Not Found
+INFO:     45.194.92.38:56764 - "POST /_next/server HTTP/1.1" 404 Not Found
+INFO:     45.194.92.38:35422 - "POST /app HTTP/1.1" 404 Not Found
+INFO:     45.194.92.38:50972 - "POST /api/route HTTP/1.1" 404 Not Found
+WARNING:  WatchFiles detected changes in 'app/main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [318141]
+Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+Failed to send telemetry event ClientCreateCollectionEvent: capture() takes 1 positional argument but 3 were given
+INFO:     Started server process [348136]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+✅ Knowledge base already loaded (40 chunks)
+✅ Database tables initialized (including multi-tenant tables)
+🗣️ Speech settings loaded: lang=hi-IN, voice=hi-IN-AartiNeural
+🔊 Pre-initializing Azure Speech services...
+   ✅ Regular TTS synthesizer (16kHz) ready
+   ✅ Telephony TTS synthesizer (8kHz) ready
+🔊 Speech services initialized in 304ms
+🔥 LLM connection pre-warmed!
+INFO:     182.95.174.34:0 - "GET /api/frejun/config HTTP/1.1" 200 OK
+INFO:     121.241.75.242:0 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     121.241.75.242:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     182.95.174.34:0 - "GET /api/calls HTTP/1.1" 200 OK
+📞 Initiating FreJun call: +918065171340 → +919794602394
+   Flow URL: https://voice.anvenssa.com/api/frejun/flow/eb3125cc
+📞 Call created in DB: f71deee8-68e3-4051-a2bd-51ff603a5516 (Agent: c0c15538-6f40-4076-9e97-1402694385c3)
+💾 Call saved to database with ID: f71deee8-68e3-4051-a2bd-51ff603a5516
+✅ FreJun call initiated: eb3125cc (FreJun ID: eb3125cc)
+   To: +919794602394, From: +918065171340
+INFO:     182.95.174.34:0 - "POST /api/frejun/initiate-call HTTP/1.1" 200 OK
+📨 FreJun webhook: call.initiated
+   Data: {'call_id': 'cdbae28c-c05e-45da-92e1-de10407edad0', 'from': '+918065171340', 'to': '+919794602394', 'direction': 'outgoing', 'startTime': '2026-02-10T09:54:43.944Z'}
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+📨 FreJun webhook: call.answered
+   Data: {'call_id': 'cdbae28c-c05e-45da-92e1-de10407edad0', 'from': '+918065171340', 'to': '+919794602394', 'direction': 'outgoing', 'startTime': '2026-02-10T09:54:43.944Z', 'answer_time': '2026-02-10T09:54:50.484Z'}
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+📋 FreJun requesting flow for call eb3125cc (POST)
+   Returning WebSocket URL: wss://voice.anvenssa.com/ws/frejun-audio?agent_id=c0c15538-6f40-4076-9e97-1402694385c3&user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f
+INFO:     13.202.4.3:0 - "POST /api/frejun/flow/eb3125cc HTTP/1.1" 200 OK
+📨 FreJun webhook: stream.initiated
+   Data: {'call_id': 'cdbae28c-c05e-45da-92e1-de10407edad0', 'stream_id': '21224c41-2501-4df0-8015-ee82ae3b4465', 'time': '2026-02-10T09:54:50.544Z'}
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+INFO:     ('13.202.4.3', 0) - "WebSocket /ws/frejun-audio?agent_id=c0c15538-6f40-4076-9e97-1402694385c3&user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f" [accepted]
+INFO:     connection open
+INFO:     connection closed
+🔗 FreJun WebSocket connection attempt from: Address(host='13.202.4.3', port=0)
+   Headers: {'upgrade': 'websocket', 'connection': 'upgrade', 'host': 'voice.anvenssa.com', 'x-real-ip': '13.202.4.3', 'x-forwarded-for': '13.202.4.3', 'x-forwarded-proto': 'https', 'sec-websocket-version': '13', 'sec-websocket-key': 'Ni/JpBFuNFBI7rMMpbrzYQ==', 'sec-websocket-extensions': 'permessage-deflate; client_max_window_bits'}
+   🤖 Loading agent: Anvenssa Consultancy Pvt. Ltd  (ID: c0c15538-6f40-4076-9e97-1402694385c3)
+   📚 KB: f0becb58, Voice: en-US-SaraNeural
+🔗 FreJun WebSocket connected successfully
+📞 FreJun WS linked to existing call: f71deee8-68e3-4051-a2bd-51ff603a5516 (provider: eb3125cc), Agent: Anvenssa Consultancy Pvt. Ltd 
+📡 FreJun stream started: 21224c41-2501-4df0-8015-ee82ae3b4465, sample_rate=8000
+   FreJun Call ID: cdbae28c-c05e-45da-92e1-de10407edad0
+📞 Call phone numbers updated: f71deee8-68e3-4051-a2bd-51ff603a5516 -> None -> None
+   🔗 Updated provider_call_id to: cdbae28c-c05e-45da-92e1-de10407edad0
+🎤 Sending FreJun opening message...
+   🔍 Searching agent KB: f0becb58
+   🔍 Searching KB by ID: f0becb58 (collection: kb_f0becb58)
+   📊 Collection has 0 chunks
+   ⚠️ KB collection is empty
+   📭 No relevant context found in agent KB (13ms)
+   📞 TTS (agent voice: en-US-SaraNeural): 137064 bytes, 602ms
+📞 Opening sent: 3258ms
+🧑 STT: 'Hello.'
+   🤖 LLM streaming for agent: Anvenssa Consultancy Pvt. Ltd ...
+   ⏩ Skipping RAG (simple query)
+   📞 TTS (agent voice: en-US-SaraNeural): 37486 bytes, 180ms
+   📊 TIMING: Total=767ms
+❌ FreJun WebSocket error: (<CloseCode.NO_STATUS_RCVD: 1005>, None)
+💾 Full transcript saved to database for call: f71deee8-68e3-4051-a2bd-51ff603a5516
+📴 Call ended in DB: f71deee8-68e3-4051-a2bd-51ff603a5516 - Reason: unknown
+💾 Transcript saved to database: f71deee8-68e3-4051-a2bd-51ff603a5516
+🎯 Starting sentiment analysis for call f71deee8-68e3-4051-a2bd-51ff603a5516...
+🎯 Sentiment Analysis Complete: Unclear
+💾 Sentiment saved for call f71deee8-68e3-4051-a2bd-51ff603a5516: Unclear
+📞 FreJun call ended. Duration: 9.9s, Reason: None
+🧑 STT: ''
+📨 FreJun webhook: stream.completed
+   Data: {'call_id': 'cdbae28c-c05e-45da-92e1-de10407edad0', 'stream_id': '21224c41-2501-4df0-8015-ee82ae3b4465', 'time': '2026-02-10T09:55:00.518Z'}
+📊 Call status updated: f71deee8-68e3-4051-a2bd-51ff603a5516 -> stream_completed
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+📨 FreJun webhook: call.completed
+   Data: {'call_id': 'cdbae28c-c05e-45da-92e1-de10407edad0', 'from': '+918065171340', 'to': '+919794602394', 'direction': 'outgoing', 'startTime': '2026-02-10T09:54:43.944Z', 'answer_time': '2026-02-10T09:54:50.484Z', 'hangup_time': '2026-02-10T09:55:00.444Z', 'duration': 9960}
+📊 Call status updated: f71deee8-68e3-4051-a2bd-51ff603a5516 -> completed
+📞 Call phone numbers updated: f71deee8-68e3-4051-a2bd-51ff603a5516 -> +918065171340 -> +919794602394
+📴 Call ended in DB: f71deee8-68e3-4051-a2bd-51ff603a5516 - Reason: completed
+   🎯 Running sentiment analysis for call cdbae28c-c05e-45da-92e1-de10407edad0...
+🎯 Sentiment Analysis Complete: Unclear
+💾 Sentiment saved for call f71deee8-68e3-4051-a2bd-51ff603a5516: Unclear
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+📨 FreJun webhook: recording.completed
+   Data: {'call_id': 'cdbae28c-c05e-45da-92e1-de10407edad0', 'recording_id': 'bb89b38f-04a7-4851-9565-cc8e5f0c224a', 'recording_url': 'https://api.frejun.ai/api/v1/recordings/?recording_id=bb89b38f-04a7-4851-9565-cc8e5f0c224a'}
+🎙️ Call recording updated: f71deee8-68e3-4051-a2bd-51ff603a5516
+   💾 Recording URL saved: https://api.frejun.ai/api/v1/recordings/?recording...
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+INFO:     182.95.174.34:0 - "GET /api/calls/history?user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f HTTP/1.1" 200 OK
+❌ Error updating agent: (pymysql.err.DataError) (1406, "Data too long for column 'phone_number' at row 1")
+[SQL: UPDATE agents SET phone_number=%(phone_number)s, updated_at=%(updated_at)s WHERE agents.id = %(agents_id)s]
+[parameters: {'phone_number': 'justcalls.sip.frejun.ai', 'updated_at': datetime.datetime(2026, 2, 10, 9, 55, 34, 622345), 'agents_id': '74d442e0-60fd-47bf-93ef-b36d5eb0339c'}]
+(Background on this error at: https://sqlalche.me/e/20/9h9h)
+INFO:     134.195.138.73:0 - "PUT /api/agents/74d442e0-60fd-47bf-93ef-b36d5eb0339c HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/cursors.py", line 153, in execute
+    result = self._query(query)
+             ^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/cursors.py", line 322, in _query
+    conn.query(q)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/connections.py", line 558, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/connections.py", line 822, in _read_query_result
+    result.read()
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/connections.py", line 1200, in read
+    first_packet = self.connection._read_packet()
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/connections.py", line 772, in _read_packet
+    packet.raise_for_error()
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/protocol.py", line 221, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/err.py", line 143, in raise_mysql_exception
+    raise errorclass(errno, errval)
+pymysql.err.DataError: (1406, "Data too long for column 'phone_number' at row 1")
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/uvicorn/protocols/http/httptools_impl.py", line 419, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/fastapi/applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/applications.py", line 123, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/middleware/cors.py", line 83, in __call__
+    await self.app(scope, receive, send)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/routing.py", line 762, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/routing.py", line 782, in app
+    await route.handle(scope, receive, send)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/routing.py", line 297, in handle
+    await self.app(scope, receive, send)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/routing.py", line 77, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/routing.py", line 72, in app
+    response = await func(request)
+               ^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/fastapi/routing.py", line 299, in app
+    raise e
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/fastapi/routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/fastapi/routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/app/api/agents.py", line 294, in update_agent
+    agent = agent_service.update_agent(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/app/db/service.py", line 922, in update_agent
+    db.commit()
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 1969, in commit
+    trans.commit(_to_root=True)
+  File "<string>", line 2, in commit
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/state_changes.py", line 139, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 1256, in commit
+    self._prepare_impl()
+  File "<string>", line 2, in _prepare_impl
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/state_changes.py", line 139, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 1231, in _prepare_impl
+    self.session.flush()
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4312, in flush
+    self._flush(objects)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4447, in _flush
+    with util.safe_reraise():
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 146, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4408, in _flush
+    flush_context.execute()
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 85, in save_obj
+    _emit_update_statements(
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 910, in _emit_update_statements
+    c = connection.execute(
+        ^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1416, in execute
+    return meth(
+           ^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 517, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1639, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2344, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/cursors.py", line 153, in execute
+    result = self._query(query)
+             ^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/cursors.py", line 322, in _query
+    conn.query(q)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/connections.py", line 558, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/connections.py", line 822, in _read_query_result
+    result.read()
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/connections.py", line 1200, in read
+    first_packet = self.connection._read_packet()
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/connections.py", line 772, in _read_packet
+    packet.raise_for_error()
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/protocol.py", line 221, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/err.py", line 143, in raise_mysql_exception
+    raise errorclass(errno, errval)
+sqlalchemy.exc.DataError: (pymysql.err.DataError) (1406, "Data too long for column 'phone_number' at row 1")
+[SQL: UPDATE agents SET phone_number=%(phone_number)s, updated_at=%(updated_at)s WHERE agents.id = %(agents_id)s]
+[parameters: {'phone_number': 'justcalls.sip.frejun.ai', 'updated_at': datetime.datetime(2026, 2, 10, 9, 55, 34, 622345), 'agents_id': '74d442e0-60fd-47bf-93ef-b36d5eb0339c'}]
+(Background on this error at: https://sqlalche.me/e/20/9h9h)
+❌ Error updating agent: (pymysql.err.DataError) (1406, "Data too long for column 'phone_number' at row 1")
+[SQL: UPDATE agents SET phone_number=%(phone_number)s, updated_at=%(updated_at)s WHERE agents.id = %(agents_id)s]
+[parameters: {'phone_number': 'justcalls.sip.frejun.ai', 'updated_at': datetime.datetime(2026, 2, 10, 9, 56, 3, 979367), 'agents_id': '74d442e0-60fd-47bf-93ef-b36d5eb0339c'}]
+(Background on this error at: https://sqlalche.me/e/20/9h9h)
+INFO:     127.0.0.1:36800 - "PUT /api/agents/74d442e0-60fd-47bf-93ef-b36d5eb0339c HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/cursors.py", line 153, in execute
+    result = self._query(query)
+             ^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/cursors.py", line 322, in _query
+    conn.query(q)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/connections.py", line 558, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/connections.py", line 822, in _read_query_result
+    result.read()
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/connections.py", line 1200, in read
+    first_packet = self.connection._read_packet()
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/connections.py", line 772, in _read_packet
+    packet.raise_for_error()
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/protocol.py", line 221, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/err.py", line 143, in raise_mysql_exception
+    raise errorclass(errno, errval)
+pymysql.err.DataError: (1406, "Data too long for column 'phone_number' at row 1")
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/uvicorn/protocols/http/httptools_impl.py", line 419, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/fastapi/applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/applications.py", line 123, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/middleware/cors.py", line 83, in __call__
+    await self.app(scope, receive, send)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/routing.py", line 762, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/routing.py", line 782, in app
+    await route.handle(scope, receive, send)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/routing.py", line 297, in handle
+    await self.app(scope, receive, send)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/routing.py", line 77, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 64, in wrapped_app
+    raise exc
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    await app(scope, receive, sender)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/starlette/routing.py", line 72, in app
+    response = await func(request)
+               ^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/fastapi/routing.py", line 299, in app
+    raise e
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/fastapi/routing.py", line 294, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/fastapi/routing.py", line 191, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/app/api/agents.py", line 294, in update_agent
+    agent = agent_service.update_agent(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/app/db/service.py", line 922, in update_agent
+    db.commit()
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 1969, in commit
+    trans.commit(_to_root=True)
+  File "<string>", line 2, in commit
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/state_changes.py", line 139, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 1256, in commit
+    self._prepare_impl()
+  File "<string>", line 2, in _prepare_impl
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/state_changes.py", line 139, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 1231, in _prepare_impl
+    self.session.flush()
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4312, in flush
+    self._flush(objects)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4447, in _flush
+    with util.safe_reraise():
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 146, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4408, in _flush
+    flush_context.execute()
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 466, in execute
+    rec.execute(self)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 85, in save_obj
+    _emit_update_statements(
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 910, in _emit_update_statements
+    c = connection.execute(
+        ^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1416, in execute
+    return meth(
+           ^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 517, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1639, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2344, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 922, in do_execute
+    cursor.execute(statement, parameters)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/cursors.py", line 153, in execute
+    result = self._query(query)
+             ^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/cursors.py", line 322, in _query
+    conn.query(q)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/connections.py", line 558, in query
+    self._affected_rows = self._read_query_result(unbuffered=unbuffered)
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/connections.py", line 822, in _read_query_result
+    result.read()
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/connections.py", line 1200, in read
+    first_packet = self.connection._read_packet()
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/connections.py", line 772, in _read_packet
+    packet.raise_for_error()
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/protocol.py", line 221, in raise_for_error
+    err.raise_mysql_exception(self._data)
+  File "/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/pymysql/err.py", line 143, in raise_mysql_exception
+    raise errorclass(errno, errval)
+sqlalchemy.exc.DataError: (pymysql.err.DataError) (1406, "Data too long for column 'phone_number' at row 1")
+[SQL: UPDATE agents SET phone_number=%(phone_number)s, updated_at=%(updated_at)s WHERE agents.id = %(agents_id)s]
+[parameters: {'phone_number': 'justcalls.sip.frejun.ai', 'updated_at': datetime.datetime(2026, 2, 10, 9, 56, 3, 979367), 'agents_id': '74d442e0-60fd-47bf-93ef-b36d5eb0339c'}]
+(Background on this error at: https://sqlalche.me/e/20/9h9h)
+INFO:     117.217.97.28:0 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     117.217.97.28:0 - "GET /api/calls HTTP/1.1" 200 OK
+INFO:     117.217.97.28:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     117.217.97.28:0 - "GET /api/frejun/config HTTP/1.1" 200 OK
+INFO:     117.217.97.28:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     117.217.97.28:0 - "GET /api/calls/history?user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f HTTP/1.1" 200 OK
+✅ Agent updated: Juztcalls Agent
+INFO:     127.0.0.1:57854 - "PUT /api/agents/74d442e0-60fd-47bf-93ef-b36d5eb0339c HTTP/1.1" 200 OK
+INFO:     117.217.97.28:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46372 - "GET /api/agents/74d442e0-60fd-47bf-93ef-b36d5eb0339c HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'app/db/models.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [348136]
+Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+Failed to send telemetry event ClientCreateCollectionEvent: capture() takes 1 positional argument but 3 were given
+INFO:     Started server process [349114]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+✅ Knowledge base already loaded (40 chunks)
+✅ Database tables initialized (including multi-tenant tables)
+🗣️ Speech settings loaded: lang=hi-IN, voice=hi-IN-AartiNeural
+🔊 Pre-initializing Azure Speech services...
+   ✅ Regular TTS synthesizer (16kHz) ready
+   ✅ Telephony TTS synthesizer (8kHz) ready
+🔊 Speech services initialized in 303ms
+🔥 LLM connection pre-warmed!
+INFO:     117.217.97.28:0 - "GET /api/calls/history?user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f HTTP/1.1" 200 OK
+INFO:     117.217.97.28:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     117.217.97.28:0 - "GET /api/calls/history?user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f HTTP/1.1" 200 OK
+INFO:     117.217.97.28:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     117.217.97.28:0 - "GET /api/agents/c0c15538-6f40-4076-9e97-1402694385c3 HTTP/1.1" 200 OK
+INFO:     117.217.97.28:0 - "GET /api/agent/prompt-variables HTTP/1.1" 200 OK
+INFO:     117.217.97.28:0 - "GET /api/agent/voices HTTP/1.1" 200 OK
+INFO:     117.217.97.28:0 - "GET /api/agents/c0c15538-6f40-4076-9e97-1402694385c3/knowledge-bases HTTP/1.1" 200 OK
+INFO:     117.217.97.28:0 - "GET /api/calls/history?user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f HTTP/1.1" 200 OK
+📋 FreJun requesting flow for call incoming
+ (POST)
+   Returning WebSocket URL: wss://voice.anvenssa.com/ws/frejun-audio
+INFO:     182.95.174.34:0 - "POST /api/frejun/flow/incoming%0A HTTP/1.1" 200 OK
+📨 FreJun webhook: unknown
+   Data: {}
+INFO:     182.95.174.34:0 - "POST /api/frejun/webhook%0A HTTP/1.1" 200 OK
+📋 FreJun requesting flow for call incoming
+ (POST)
+   Returning WebSocket URL: wss://voice.anvenssa.com/ws/frejun-audio
+INFO:     182.95.174.34:0 - "POST /api/frejun/flow/incoming%0A HTTP/1.1" 200 OK
+INFO:     162.243.163.212:50756 - "GET / HTTP/1.1" 200 OK
+INFO:     146.19.24.133:36170 - "GET / HTTP/1.1" 200 OK
+INFO:     146.19.24.133:36180 - "POST / HTTP/1.1" 405 Method Not Allowed
+INFO:     146.19.24.133:37928 - "POST /_next HTTP/1.1" 404 Not Found
+INFO:     146.19.24.133:37940 - "POST /api HTTP/1.1" 404 Not Found
+INFO:     146.19.24.133:37952 - "POST /_next/server HTTP/1.1" 404 Not Found
+INFO:     146.19.24.133:37966 - "POST /app HTTP/1.1" 404 Not Found
+INFO:     146.19.24.133:37976 - "POST /api/route HTTP/1.1" 404 Not Found
+INFO:     182.95.174.34:0 - "GET /api/frejun/config HTTP/1.1" 200 OK
+INFO:     182.95.174.34:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     121.241.75.242:0 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     121.241.75.242:0 - "GET /api/calls HTTP/1.1" 200 OK
+INFO:     34.158.168.101:0 - "GET /api/.env HTTP/1.1" 404 Not Found
+INFO:     34.158.168.101:0 - "GET /api/.env HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:42224 - "GET / HTTP/1.0" 200 OK
+WARNING:  Invalid HTTP request received.
+INFO:     139.144.52.241:43634 - "GET /nice%20ports%2C/Trinity.txt.bak HTTP/1.0" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     139.144.52.241:46008 - "OPTIONS / HTTP/1.0" 405 Method Not Allowed
+INFO:     139.144.52.241:46904 - "OPTIONS / HTTP/1.0" 405 Method Not Allowed
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     139.144.52.241:54924 - "GET /devicedesc.xml HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     139.144.52.241:34926 - "GET /nmaplowercheck1770743125 HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:34964 - "GET /Portal0000.htm HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     139.144.52.241:34928 - "GET /server-status HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:34946 - "GET /health HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:34950 - "GET / HTTP/1.1" 200 OK
+INFO:     139.144.52.241:35540 - "GET /HNAP1 HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:35546 - "GET /__Additional HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:35544 - "GET / HTTP/1.1" 200 OK
+INFO:     139.144.52.241:35602 - "GET /dniapi/userInfos HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:35598 - "GET /CFIDE/componentutils/ HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:35608 - "GET /api/v2/about HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:36046 - "GET /.git/HEAD HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:36210 - "GET /human.aspx?arg12=infotech HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     139.144.52.241:36214 - "GET /Portal/Portal.mwsl HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:36282 - "GET /?=PHPE9568F36-D428-11d2-A769-00AA001ACF42 HTTP/1.1" 200 OK
+INFO:     139.144.52.241:36286 - "GET /login.php HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:36754 - "GET /CSS/Miniweb.css HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     139.144.52.241:36830 - "GET /docs/cplugError.html/ HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:36880 - "GET /?=PHPB8B5F2A0-3C92-11d3-A3A9-4C7B08C10000 HTTP/1.1" 200 OK
+INFO:     139.144.52.241:36918 - "GET /user HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:36916 - "GET /dana-na/nc/nc_gina_ver.txt HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+WARNING:  Invalid HTTP request received.
+INFO:     139.144.52.241:38542 - "GET /geoserver/ HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:0 - "GET /api/v2/about HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:39466 - "GET /%2BCSCOE%2B/logon.html HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:40280 - "GET /geoserver/index.html HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:40282 - "GET /magento_version HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     139.144.52.241:39828 - "GET /api/v1/check-version HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:0 - "GET /api/v1/check-version HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:41258 - "GET /fog/management/index.php?node=client&sub=logininfo HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:41300 - "GET /rest/applinks/1.0/manifest HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:41382 - "GET /apps/zxtm/login.cgi HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:41450 - "GET /helpdesk/WebObjects/Helpdesk.woa HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:41920 - "GET /api/server/version HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     139.144.52.241:42028 - "GET /AVwN HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:42092 - "GET /inicio.shtml HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:42170 - "GET /confluence/rest/applinks/1.0/manifest HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:42174 - "GET /webui HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:42278 - "GET /administrator/manifests/files/joomla.xml HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:42326 - "GET /language/en-GB/en-GB.xml HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:42792 - "POST /sdk HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:42790 - "GET /versa/login HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:42920 - "GET /login.html HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:42922 - "GET /admin.php HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:42968 - "GET / HTTP/1.1" 200 OK
+INFO:     139.144.52.241:43010 - "GET /cgi-mod/header_logo.cgi?size=big HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:43584 - "GET /api/version HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:43700 - "GET /base.inc HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:43744 - "GET /owa/ HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:43820 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:43972 - "GET /status HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:42970 - "GET /cluster/list.query HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:44016 - "GET /portal/ HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:43348 - "GET /p/login/ HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     139.144.52.241:44614 - "GET /owa/ HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:44652 - "GET /ise/img/rm-logo_small.png HTTP/1.1" 404 Not Found
+INFO:     139.144.52.241:44702 - "GET /info.asp HTTP/1.1" 404 Not Found
+INFO:     45.156.131.23:60773 - "GET / HTTP/1.1" 200 OK
+INFO:     34.158.168.101:0 - "GET /api/.env HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     18.218.118.203:52678 - "GET / HTTP/1.1" 200 OK
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     103.252.53.40:0 - "GET /api/frejun/config HTTP/1.1" 200 OK
+INFO:     103.252.53.40:0 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     103.252.53.40:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     103.252.53.40:0 - "GET /api/calls HTTP/1.1" 200 OK
+INFO:     34.158.168.101:0 - "GET /api/.env HTTP/1.1" 404 Not Found
+INFO:     34.158.168.101:0 - "GET /api/.env HTTP/1.1" 404 Not Found
+INFO:     34.158.168.101:0 - "GET /api/.env HTTP/1.1" 404 Not Found
+INFO:     45.194.92.38:51062 - "POST / HTTP/1.1" 405 Method Not Allowed
+INFO:     45.194.92.38:37330 - "POST /_next HTTP/1.1" 404 Not Found
+INFO:     45.194.92.38:37362 - "POST /api HTTP/1.1" 404 Not Found
+INFO:     45.194.92.38:39390 - "POST /_next/server HTTP/1.1" 404 Not Found
+INFO:     45.194.92.38:40748 - "POST /app HTTP/1.1" 404 Not Found
+INFO:     45.194.92.38:43434 - "POST /api/route HTTP/1.1" 404 Not Found
+INFO:     165.154.182.174:53774 - "GET / HTTP/1.1" 200 OK
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     34.158.168.101:0 - "GET /api/.env HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:57282 - "GET / HTTP/1.0" 200 OK
+WARNING:  Invalid HTTP request received.
+INFO:     198.58.117.211:57312 - "GET /nice%20ports%2C/Trinity.txt.bak HTTP/1.0" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     198.58.117.211:46220 - "OPTIONS / HTTP/1.0" 405 Method Not Allowed
+INFO:     198.58.117.211:46256 - "OPTIONS / HTTP/1.0" 405 Method Not Allowed
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     198.58.117.211:42132 - "GET /devicedesc.xml HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     198.58.117.211:57176 - "GET / HTTP/1.1" 200 OK
+INFO:     198.58.117.211:57190 - "GET /nmaplowercheck1770873094 HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:57234 - "GET /inicio.aspx HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:57246 - "GET /health HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:57206 - "POST /sdk HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:57348 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:57344 - "GET /home.cfm HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:57340 - "GET /evox/about HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     198.58.117.211:57422 - "GET /human.aspx?arg12=infotech HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:57410 - "GET /login.php HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     198.58.117.211:57432 - "GET /default.html HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:57460 - "GET /webui HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:57442 - "GET /dniapi/userInfos HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:57456 - "GET /dana-na/nc/nc_gina_ver.txt HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:57494 - "GET /api/v2/about HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:57504 - "GET /webui HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+WARNING:  Invalid HTTP request received.
+INFO:     198.58.117.211:57522 - "GET /home.cgi HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:57538 - "GET /cgi-mod/header_logo.cgi?size=big HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:57554 - "GET /%2BCSCOE%2B/logon.html HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:57542 - "GET /user HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:57562 - "GET /CFIDE/componentutils/ HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39186 - "GET /main.asp HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39198 - "GET /rest/applinks/1.0/manifest HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:57166 - "GET / HTTP/1.1" 200 OK
+INFO:     198.58.117.211:39224 - "GET /confluence/rest/applinks/1.0/manifest HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39212 - "GET /start.jhtml HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39238 - "GET /base.html HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39252 - "GET / HTTP/1.1" 200 OK
+INFO:     198.58.117.211:0 - "GET /api/v1/check-version HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39256 - "GET /start.html HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39274 - "GET /nmaplowercheck1770873096 HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:0 - "GET /api/server/version HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39314 - "GET /inicio.shtml HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39340 - "GET /HNAP1 HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39354 - "GET /indice.shtml HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:0 - "GET /api/version HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39400 - "GET /inicio.jhtml HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39428 - "GET /geoserver/index.html HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39434 - "GET /geoserver/ HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39442 - "GET /cgi-bin/info.cgi HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39454 - "GET /main.cgi HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39494 - "GET /magento_version HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39482 - "GET /dashboard/ HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39484 - "GET /geoserver/web/wicket/bookmarkable/org.geoserver.web.AboutGeoServerPage HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39508 - "GET /fog/management/index.php?node=client&sub=logininfo HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39512 - "GET /index.php HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39524 - "GET / HTTP/1.1" 200 OK
+INFO:     198.58.117.211:0 - "GET /api/vip/i18n/api/v2/translation/products/vRNIUI/versions/1 HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39540 - "GET /webui/index.html HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39546 - "GET /api/server/version HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39542 - "GET /cluster/list.query HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39556 - "GET /apps/zxtm/login.cgi HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39572 - "GET /robots.txt HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39584 - "GET /helpdesk/WebObjects/Helpdesk.woa HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39590 - "GET /owa/ HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44744 - "GET /language/en-GB/en-GB.xml HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44756 - "GET /xml/info.xml HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44774 - "GET /login.html HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44758 - "GET /p/login/ HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44780 - "GET /admin.php HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44776 - "GET /versa/login HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44794 - "GET /owa/ HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:39578 - "GET /ise/img/rm-logo_small.png HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44810 - "GET /Account/Login HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:0 - "GET /api/v1.0/environment HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44826 - "GET /status HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44838 - "GET /administrator/manifests/files/joomla.xml HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44822 - "GET /menu.jhtml HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44858 - "GET /cgi-bin/param.cgi?get_device_conf HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44850 - "GET /info.asp HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44872 - "GET /images/logo.png HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44860 - "GET /lms/db HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44888 - "GET /ext-js/app/common/zld_product_spec.js HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44896 - "GET /default.asp HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44912 - "GET /allversions HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44916 - "GET /login/login.html HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44918 - "GET /phoenix/favicon.ico HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44934 - "GET /r-seenet/index.php HTTP/1.1" 404 Not Found
+WARNING:  Invalid HTTP request received.
+INFO:     198.58.117.211:44946 - "GET /api/vip/i18n/api/v2/translation/products/vRNIUI/versions/1 HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44952 - "GET /versions HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44964 - "GET /readme.txt HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44980 - "GET /assets/png/favicon-abe32304.png HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44994 - "GET /c/login HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45004 - "GET /WebApp/js/UI_String.js HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45034 - "GET /login.aspx HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45048 - "GET /officescan/console/html/localization.js HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45070 - "GET /dana-cached/hc/HostCheckerInstaller.osx HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45062 - "GET /start.cfm HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45078 - "GET /App_Themes/Default/Images/favicon.ico HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45080 - "GET /officescan/console/cgi/cgiChkMasterPwd.exe HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45092 - "GET /IPCamDesc.xml HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45108 - "GET /api/v1.0/environment HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45112 - "GET /kylin/ HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45128 - "GET /cslu/v1/core/conf HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45130 - "GET /api/v1/check-version HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45146 - "GET /start.aspx HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45160 - "GET /images/logo.gif HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45168 - "GET /config HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45184 - "GET /admin/reports/status HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45194 - "GET /admin/reports/updates HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45198 - "GET /localstart.jhtml HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45204 - "GET /pom.xml HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45218 - "GET /javascript/validation/OEM.js HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45226 - "GET /CHANGELOG.txt HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45220 - "GET /assets/img/favicon.ico HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:0 - "GET /api/v3/meta HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45240 - "GET /build.gradle HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45272 - "GET /workplace/home.action HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45256 - "GET /admin.shtml HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45278 - "GET /pandora_console/ HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45290 - "GET /themes/admin/default/build/assets/favicon-19fbef86.svg HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45288 - "GET /centreon/api/latest/platform/versions HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45298 - "GET /cgi-bin/authLogin.cgi HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45312 - "GET /css/eonweb.css HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45318 - "GET /webportal.cgi HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:0 - "GET /api/v1/version HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45330 - "GET /base.jsa HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45334 - "GET /api/version HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45348 - "GET /api/v3/meta HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45352 - "GET /tos/index.php?user/login HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45356 - "GET /dashboard/favicon.ico HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45374 - "GET /am_bin/amlogin HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45394 - "GET /home.pl HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45384 - "GET /api/v1/version HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45382 - "GET /system/version/current HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45406 - "GET /i18n/component/JS HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45408 - "GET /kubepi/fav.png HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45416 - "GET /hx/api/about HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45424 - "GET /geoserver/web/ HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45450 - "GET /indice.jsa HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45456 - "GET /MagicInfo/config.js HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45460 - "GET /login/?next=/ HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45472 - "GET /plugin/webs_model_cfg.js HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45488 - "GET /public/static/favicon.png HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45496 - "GET /cgi-bin/luci HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45518 - "GET /json/login_session HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45526 - "GET /inicio.html HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45528 - "GET /rs/application-about HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45532 - "GET /nidp/app/login HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45548 - "GET /metrics HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45542 - "GET /index.html HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45564 - "GET /photo/webapi/query.php?api=SYNO.API.Info&method=query&version=1 HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45578 - "GET /index.cfm HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45600 - "GET /css/elfinder.min.css HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45592 - "GET /about HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45598 - "GET /Main_Login.asp HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45612 - "GET /main/main.html HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45642 - "GET /api/v2/hoverfly/version HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45656 - "GET /core/auth/login/ HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45668 - "GET /admin.jsa HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:0 - "GET /api/v2/hoverfly/version HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45678 - "GET /ui/login.action HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45690 - "GET /api/status HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45700 - "GET /api/v1/info HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45682 - "GET /admin/config.php HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45724 - "GET /admin.jhtml HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45704 - "GET /config_dump HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45710 - "GET /~login HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:0 - "GET /api/v1/info HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45726 - "GET /mailinspector/login.php HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45752 - "GET /agent/vicidial.php HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45742 - "GET /index.do HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45768 - "GET /AppsHome.do HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45774 - "GET /agc/vicidial.php HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45802 - "GET /admin.html HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45818 - "GET /system/gwinfo HTTP/1.1" 404 Not Found
+/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/fastapi/openapi/utils.py:207: UserWarning: Duplicate Operation ID get_call_flow_api_frejun_flow__call_id__get for function get_call_flow at /root/project/Ai_Voice_Agent_Azure/app/api/frejun.py
+  warnings.warn(message, stacklevel=1)
+/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/fastapi/openapi/utils.py:207: UserWarning: Duplicate Operation ID get_incoming_call_flow_api_frejun_flow_incoming_get for function get_incoming_call_flow at /root/project/Ai_Voice_Agent_Azure/app/api/frejun.py
+  warnings.warn(message, stacklevel=1)
+/root/project/Ai_Voice_Agent_Azure/venv/lib/python3.12/site-packages/fastapi/openapi/utils.py:207: UserWarning: Duplicate Operation ID get_prompt_variables_api_agent_prompt_variables_get for function get_prompt_variables at /root/project/Ai_Voice_Agent_Azure/app/main.py
+  warnings.warn(message, stacklevel=1)
+INFO:     198.58.117.211:45828 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     198.58.117.211:45824 - "GET /portal/ HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45834 - "GET /decisioncenter-api/v1/about HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:0 - "GET /api/status HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45858 - "GET /jtcgi/wte.pyc HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:45868 - "GET /nifi/ HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44008 - "GET /admin.cgi HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44026 - "GET /nifi-api/flow/about HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44014 - "GET /index.lua HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44038 - "GET /info.htm HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44054 - "GET /cgi-bin/meteobridge.cgi HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44058 - "GET /api-description HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44070 - "GET /v2 HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44084 - "GET /monitor/index.php/auth/login HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44092 - "GET /menu.html HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44106 - "GET /wp-content/plugins/post-smtp/readme.txt HTTP/1.1" 404 Not Found
+INFO:     198.58.117.211:44296 - "GET / HTTP/1.1" 200 OK
+WARNING:  Invalid HTTP request received.
+INFO:     45.194.92.38:45196 - "POST / HTTP/1.1" 405 Method Not Allowed
+INFO:     45.194.92.38:41886 - "POST /_next HTTP/1.1" 404 Not Found
+INFO:     45.194.92.38:60558 - "POST /api HTTP/1.1" 404 Not Found
+INFO:     45.194.92.38:55868 - "POST /_next/server HTTP/1.1" 404 Not Found
+INFO:     45.194.92.38:32980 - "POST /app HTTP/1.1" 404 Not Found
+INFO:     45.194.92.38:58162 - "POST /api/route HTTP/1.1" 404 Not Found
+INFO:     121.241.75.242:0 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     121.241.75.242:0 - "GET /api/frejun/config HTTP/1.1" 200 OK
+INFO:     182.95.174.34:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     182.95.174.34:0 - "GET /api/calls HTTP/1.1" 200 OK
+📞 Initiating FreJun call: +918065171340 → +919834292962
+   Flow URL: https://voice.anvenssa.com/api/frejun/flow/be171704
+📞 Call created in DB: 47e0dfbe-9d59-4bc4-b2b5-a209e5117801 (Agent: c0c15538-6f40-4076-9e97-1402694385c3)
+💾 Call saved to database with ID: 47e0dfbe-9d59-4bc4-b2b5-a209e5117801
+✅ FreJun call initiated: be171704 (FreJun ID: be171704)
+   To: +919834292962, From: +918065171340
+INFO:     182.95.174.34:0 - "POST /api/frejun/initiate-call HTTP/1.1" 200 OK
+📨 FreJun webhook: call.initiated
+   Data: {'call_id': '16ad49c3-d442-4842-9385-61d99f85de4b', 'from': '+918065171340', 'to': '+919834292962', 'direction': 'outgoing', 'startTime': '2026-02-12T06:05:01.614Z'}
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+📨 FreJun webhook: call.answered
+   Data: {'call_id': '16ad49c3-d442-4842-9385-61d99f85de4b', 'from': '+918065171340', 'to': '+919834292962', 'direction': 'outgoing', 'startTime': '2026-02-12T06:05:01.614Z', 'answer_time': '2026-02-12T06:05:07.507Z'}
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+📋 FreJun requesting flow for call be171704 (POST)
+   Returning WebSocket URL: wss://voice.anvenssa.com/ws/frejun-audio?agent_id=c0c15538-6f40-4076-9e97-1402694385c3&user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f
+INFO:     13.202.4.3:0 - "POST /api/frejun/flow/be171704 HTTP/1.1" 200 OK
+INFO:     ('13.202.4.3', 0) - "WebSocket /ws/frejun-audio?agent_id=c0c15538-6f40-4076-9e97-1402694385c3&user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f" [accepted]
+INFO:     connection open
+🔗 FreJun WebSocket connection attempt from: Address(host='13.202.4.3', port=0)
+   Headers: {'upgrade': 'websocket', 'connection': 'upgrade', 'host': 'voice.anvenssa.com', 'x-real-ip': '13.202.4.3', 'x-forwarded-for': '13.202.4.3', 'x-forwarded-proto': 'https', 'sec-websocket-version': '13', 'sec-websocket-key': 'NKb3jiko3oraR/4/ddVQog==', 'sec-websocket-extensions': 'permessage-deflate; client_max_window_bits'}
+   🤖 Loading agent: Anvenssa Consultancy Pvt. Ltd  (ID: c0c15538-6f40-4076-9e97-1402694385c3)
+   📚 KB: f0becb58, Voice: en-US-SaraNeural
+🔗 FreJun WebSocket connected successfully
+📞 FreJun WS linked to existing call: 47e0dfbe-9d59-4bc4-b2b5-a209e5117801 (provider: be171704), Agent: Anvenssa Consultancy Pvt. Ltd 
+📨 FreJun webhook: stream.initiated
+   Data: {'call_id': '16ad49c3-d442-4842-9385-61d99f85de4b', 'stream_id': 'a8ef7dbc-17f1-4de0-a9a6-08317ef04b5d', 'time': '2026-02-12T06:05:07.566Z'}
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+📡 FreJun stream started: a8ef7dbc-17f1-4de0-a9a6-08317ef04b5d, sample_rate=8000
+   FreJun Call ID: 16ad49c3-d442-4842-9385-61d99f85de4b
+📞 Call phone numbers updated: 47e0dfbe-9d59-4bc4-b2b5-a209e5117801 -> None -> None
+   🔗 Updated provider_call_id to: 16ad49c3-d442-4842-9385-61d99f85de4b
+🎤 Sending FreJun opening message...
+   🔍 Searching agent KB: f0becb58
+   🔍 Searching KB by ID: f0becb58 (collection: kb_f0becb58)
+   📊 Collection has 0 chunks
+   ⚠️ KB collection is empty
+   📭 No relevant context found in agent KB (18ms)
+   📞 TTS (agent voice: en-US-SaraNeural): 137026 bytes, 890ms
+📞 Opening sent: 3592ms
+🧑 STT: 'Hello.'
+   🤖 LLM streaming for agent: Anvenssa Consultancy Pvt. Ltd ...
+   ⏩ Skipping RAG (simple query)
+   📞 TTS (agent voice: en-US-SaraNeural): 37486 bytes, 340ms
+   📊 TIMING: Total=1188ms
+   🎤 User speaking: "can you..."
+🧑 STT: 'Can you?'
+   🤖 LLM streaming for agent: Anvenssa Consultancy Pvt. Ltd ...
+   🔍 Searching agent KB: f0becb58
+   🔍 Searching KB by ID: f0becb58 (collection: kb_f0becb58)
+   📊 Collection has 0 chunks
+   ⚠️ KB collection is empty
+   📭 No relevant context found in agent KB (3ms)
+   📞 TTS (agent voice: en-US-SaraNeural): 69314 bytes, 629ms
+   📞 TTS (agent voice: en-US-SaraNeural): 44118 bytes, 559ms
+   📊 TIMING: Total=2110ms
+INFO:     182.95.174.34:0 - "GET /api/calls/history?user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f HTTP/1.1" 200 OK
+   🎤 User speaking: "can you..."
+⚡ BARGE-IN detected! Stopping agent (turn 3)
+   is_generating=False, time_since_audio=1.0s
+   🛑 Sending CLEAR command to FreJun (last chunk: 38)
+   🎤 User speaking: "can you say me about your lead..."
+⚡ BARGE-IN detected! Stopping agent (turn 4)
+   is_generating=False, time_since_audio=1.3s
+   🛑 Sending CLEAR command to FreJun (last chunk: 38)
+🧑 STT: 'Can you say me about your leadership team?'
+   🤖 LLM streaming for agent: Anvenssa Consultancy Pvt. Ltd ...
+   🔍 Searching agent KB: f0becb58
+   🔍 Searching KB by ID: f0becb58 (collection: kb_f0becb58)
+   📊 Collection has 0 chunks
+   ⚠️ KB collection is empty
+   📭 No relevant context found in agent KB (2ms)
+   📞 TTS (agent voice: en-US-SaraNeural): 137610 bytes, 550ms
+   📞 TTS (agent voice: en-US-SaraNeural): 86344 bytes, 342ms
+   📊 TIMING: Total=2134ms
+   🎤 User speaking: "you are not audible..."
+⚡ BARGE-IN detected! Stopping agent (turn 6)
+   is_generating=False, time_since_audio=2.3s
+   🛑 Sending CLEAR command to FreJun (last chunk: 67)
+🧑 STT: 'You are not audible.'
+   🤖 LLM streaming for agent: Anvenssa Consultancy Pvt. Ltd ...
+   ⏩ Skipping RAG (simple query)
+   📞 TTS (agent voice: en-US-SaraNeural): 37314 bytes, 215ms
+   📞 TTS (agent voice: en-US-SaraNeural): 42022 bytes, 271ms
+   📊 TIMING: Total=1454ms
+   🎤 User speaking: "hello..."
+⚡ BARGE-IN detected! Stopping agent (turn 8)
+   is_generating=False, time_since_audio=2.4s
+   🛑 Sending CLEAR command to FreJun (last chunk: 78)
+🧑 STT: 'Hello.'
+   🤖 LLM streaming for agent: Anvenssa Consultancy Pvt. Ltd ...
+   ⏩ Skipping RAG (simple query)
+   📞 TTS (agent voice: en-US-SaraNeural): 37486 bytes, 305ms
+   📊 TIMING: Total=1145ms
+   🎤 User speaking: "can..."
+⚡ BARGE-IN detected! Stopping agent (turn 10)
+   is_generating=False, time_since_audio=3.8s
+   🛑 Sending CLEAR command to FreJun (last chunk: 83)
+   🎤 User speaking: "can you say me about..."
+⚡ BARGE-IN detected! Stopping agent (turn 11)
+   is_generating=False, time_since_audio=4.4s
+   🛑 Sending CLEAR command to FreJun (last chunk: 83)
+   🎤 User speaking: "can you say me about your lead..."
+⚡ BARGE-IN detected! Stopping agent (turn 12)
+   is_generating=False, time_since_audio=5.0s
+   🛑 Sending CLEAR command to FreJun (last chunk: 83)
+   🎤 User speaking: "can you say me about your lead..."
+🧑 STT: 'Can you say me about your leadership team?'
+   🤖 LLM streaming for agent: Anvenssa Consultancy Pvt. Ltd ...
+   🔍 Searching agent KB: f0becb58
+   🔍 Searching KB by ID: f0becb58 (collection: kb_f0becb58)
+   📊 Collection has 0 chunks
+   ⚠️ KB collection is empty
+   📭 No relevant context found in agent KB (2ms)
+   📞 TTS (agent voice: en-US-SaraNeural): 137864 bytes, 532ms
+   📞 TTS (agent voice: en-US-SaraNeural): 79542 bytes, 315ms
+   📊 TIMING: Total=2506ms
+🧑 STT: ''
+   🎤 User speaking: "can..."
+   🎤 User speaking: "can you give..."
+   🎤 User speaking: "can you give me..."
+   🎤 User speaking: "can you give me your..."
+   🎤 User speaking: "can you give me your sales con..."
+🧑 STT: 'Can you give me your sales contact number?'
+   🤖 LLM streaming for agent: Anvenssa Consultancy Pvt. Ltd ...
+   🔍 Searching agent KB: f0becb58
+   🔍 Searching KB by ID: f0becb58 (collection: kb_f0becb58)
+   📊 Collection has 0 chunks
+   ⚠️ KB collection is empty
+   📭 No relevant context found in agent KB (2ms)
+   📞 TTS (agent voice: en-US-SaraNeural): 22678 bytes, 250ms
+   📞 TTS (agent voice: en-US-SaraNeural): 107200 bytes, 457ms
+   📊 TIMING: Total=1615ms
+   🎤 User speaking: "okay thank..."
+   🎤 User speaking: "okay thank you that..."
+🧑 STT: "Okay, thank you. That's it."
+   📞 TTS (agent voice: en-US-SaraNeural): 50548 bytes, 403ms
+💾 Full transcript saved to database for call: 47e0dfbe-9d59-4bc4-b2b5-a209e5117801
+📴 Call ended in DB: 47e0dfbe-9d59-4bc4-b2b5-a209e5117801 - Reason: user_intent
+💾 Transcript saved to database: 47e0dfbe-9d59-4bc4-b2b5-a209e5117801
+🎯 Starting sentiment analysis for call 47e0dfbe-9d59-4bc4-b2b5-a209e5117801...
+🎯 Sentiment Analysis Complete: Interested
+💾 Sentiment saved for call 47e0dfbe-9d59-4bc4-b2b5-a209e5117801: Interested
+📞 FreJun call ended. Duration: 69.6s, Reason: user_intent
+INFO:     121.241.75.242:0 - "GET /api/calls HTTP/1.1" 200 OK
+INFO:     182.95.174.34:0 - "GET /api/calls/history?user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f HTTP/1.1" 200 OK
+📨 FreJun webhook: stream.completed
+   Data: {'call_id': '16ad49c3-d442-4842-9385-61d99f85de4b', 'stream_id': 'a8ef7dbc-17f1-4de0-a9a6-08317ef04b5d', 'time': '2026-02-12T06:06:48.276Z'}
+📊 Call status updated: 47e0dfbe-9d59-4bc4-b2b5-a209e5117801 -> stream_completed
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+📨 FreJun webhook: call.completed
+   Data: {'call_id': '16ad49c3-d442-4842-9385-61d99f85de4b', 'from': '+918065171340', 'to': '+919834292962', 'direction': 'outgoing', 'startTime': '2026-02-12T06:05:01.614Z', 'answer_time': '2026-02-12T06:05:07.507Z', 'hangup_time': '2026-02-12T06:06:48.147Z', 'duration': 100640}
+📊 Call status updated: 47e0dfbe-9d59-4bc4-b2b5-a209e5117801 -> completed
+📞 Call phone numbers updated: 47e0dfbe-9d59-4bc4-b2b5-a209e5117801 -> +918065171340 -> +919834292962
+📴 Call ended in DB: 47e0dfbe-9d59-4bc4-b2b5-a209e5117801 - Reason: completed
+   🎯 Running sentiment analysis for call 16ad49c3-d442-4842-9385-61d99f85de4b...
+🎯 Sentiment Analysis Complete: Interested
+💾 Sentiment saved for call 47e0dfbe-9d59-4bc4-b2b5-a209e5117801: Interested
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+📨 FreJun webhook: recording.completed
+   Data: {'call_id': '16ad49c3-d442-4842-9385-61d99f85de4b', 'recording_id': '0c8c8f1d-94f6-417f-aada-f2530d426d45', 'recording_url': 'https://api.frejun.ai/api/v1/recordings/?recording_id=0c8c8f1d-94f6-417f-aada-f2530d426d45'}
+🎙️ Call recording updated: 47e0dfbe-9d59-4bc4-b2b5-a209e5117801
+   💾 Recording URL saved: https://api.frejun.ai/api/v1/recordings/?recording...
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+INFO:     connection closed
+INFO:     182.95.174.34:0 - "GET /api/frejun/config HTTP/1.1" 200 OK
+INFO:     121.241.75.242:0 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     121.241.75.242:0 - "GET /api/calls HTTP/1.1" 200 OK
+INFO:     182.95.174.34:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     121.241.75.242:0 - "GET /api/calls/history?user_id=9a77c5d4-980a-4d5f-8f6d-376459d8b13f HTTP/1.1" 200 OK
+INFO:     121.241.75.242:0 - "GET /api/calls/47e0dfbe-9d59-4bc4-b2b5-a209e5117801/recording HTTP/1.1" 200 OK
+INFO:     182.95.174.34:0 - "GET /api/calls/47e0dfbe-9d59-4bc4-b2b5-a209e5117801 HTTP/1.1" 200 OK
+📨 FreJun webhook: call.initiated
+   Data: {'call_id': '4727b17d-2cc7-43fa-adb7-b49cd5a8bf5d', 'from': '+919834292962', 'to': '+918065171340', 'direction': 'incoming', 'startTime': '2026-02-12T06:13:50.847Z'}
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+📋 FreJun requesting flow for call incoming (POST)
+   Returning WebSocket URL: wss://voice.anvenssa.com/ws/frejun-audio
+INFO:     13.202.4.3:0 - "POST /api/frejun/flow/incoming HTTP/1.1" 200 OK
+INFO:     ('13.202.4.3', 0) - "WebSocket /ws/frejun-audio" [accepted]
+INFO:     connection open
+🔗 FreJun WebSocket connection attempt from: Address(host='13.202.4.3', port=0)
+   Headers: {'upgrade': 'websocket', 'connection': 'upgrade', 'host': 'voice.anvenssa.com', 'x-real-ip': '13.202.4.3', 'x-forwarded-for': '13.202.4.3', 'x-forwarded-proto': 'https', 'sec-websocket-version': '13', 'sec-websocket-key': 'tsr7oWgQ9CHCeVmfnwyEDA==', 'sec-websocket-extensions': 'permessage-deflate; client_max_window_bits'}
+   🔍 Found agent_id from active_calls: c0c15538-6f40-4076-9e97-1402694385c3
+   🤖 Loading agent: Anvenssa Consultancy Pvt. Ltd  (ID: c0c15538-6f40-4076-9e97-1402694385c3)
+   📚 KB: f0becb58, Voice: en-US-SaraNeural
+🔗 FreJun WebSocket connected successfully
+📞 Call created in DB: b76b0da1-f0a6-4493-9c73-1d8dd29cf478 (Agent: c0c15538-6f40-4076-9e97-1402694385c3)
+📞 FreJun call started with new ID: b76b0da1-f0a6-4493-9c73-1d8dd29cf478, Agent: Anvenssa Consultancy Pvt. Ltd 
+📨 FreJun webhook: stream.initiated
+   Data: {'call_id': '4727b17d-2cc7-43fa-adb7-b49cd5a8bf5d', 'stream_id': '5fca226c-ce4a-4e22-8a6b-9d72c2fec44b', 'time': '2026-02-12T06:13:51.045Z'}
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+📨 FreJun webhook: call.answered
+   Data: {'call_id': '4727b17d-2cc7-43fa-adb7-b49cd5a8bf5d', 'from': '+919834292962', 'to': '+918065171340', 'direction': 'incoming', 'startTime': '2026-02-12T06:13:50.847Z', 'answer_time': '2026-02-12T06:13:51.047Z'}
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+INFO:     connection closed
+📡 FreJun stream started: 5fca226c-ce4a-4e22-8a6b-9d72c2fec44b, sample_rate=8000
+   FreJun Call ID: 4727b17d-2cc7-43fa-adb7-b49cd5a8bf5d
+📞 Call phone numbers updated: b76b0da1-f0a6-4493-9c73-1d8dd29cf478 -> None -> None
+   🔗 Updated provider_call_id to: 4727b17d-2cc7-43fa-adb7-b49cd5a8bf5d
+🎤 Sending FreJun opening message...
+   🔍 Searching agent KB: f0becb58
+   🔍 Searching KB by ID: f0becb58 (collection: kb_f0becb58)
+   📊 Collection has 0 chunks
+   ⚠️ KB collection is empty
+   📭 No relevant context found in agent KB (23ms)
+   📞 TTS (agent voice: en-US-SaraNeural): 137064 bytes, 679ms
+📞 Opening sent: 2987ms
+❌ FreJun WebSocket error: (<CloseCode.NO_STATUS_RCVD: 1005>, None)
+💾 Full transcript saved to database for call: b76b0da1-f0a6-4493-9c73-1d8dd29cf478
+📴 Call ended in DB: b76b0da1-f0a6-4493-9c73-1d8dd29cf478 - Reason: unknown
+💾 Transcript saved to database: b76b0da1-f0a6-4493-9c73-1d8dd29cf478
+🎯 Starting sentiment analysis for call b76b0da1-f0a6-4493-9c73-1d8dd29cf478...
+🎯 Sentiment Analysis Complete: Unclear
+💾 Sentiment saved for call b76b0da1-f0a6-4493-9c73-1d8dd29cf478: Unclear
+📞 FreJun call ended. Duration: 12.4s, Reason: None
+🧑 STT: ''
+📨 FreJun webhook: stream.completed
+   Data: {'call_id': '4727b17d-2cc7-43fa-adb7-b49cd5a8bf5d', 'stream_id': '5fca226c-ce4a-4e22-8a6b-9d72c2fec44b', 'time': '2026-02-12T06:14:03.354Z'}
+📊 Call status updated: b76b0da1-f0a6-4493-9c73-1d8dd29cf478 -> stream_completed
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+📨 FreJun webhook: call.completed
+   Data: {'call_id': '4727b17d-2cc7-43fa-adb7-b49cd5a8bf5d', 'from': '+919834292962', 'to': '+918065171340', 'direction': 'incoming', 'startTime': '2026-02-12T06:13:50.847Z', 'answer_time': '2026-02-12T06:13:51.047Z', 'hangup_time': '2026-02-12T06:14:03.327Z', 'duration': 12280}
+📊 Call status updated: b76b0da1-f0a6-4493-9c73-1d8dd29cf478 -> completed
+📞 Call phone numbers updated: b76b0da1-f0a6-4493-9c73-1d8dd29cf478 -> +919834292962 -> +918065171340
+📴 Call ended in DB: b76b0da1-f0a6-4493-9c73-1d8dd29cf478 - Reason: completed
+   🎯 Running sentiment analysis for call 4727b17d-2cc7-43fa-adb7-b49cd5a8bf5d...
+🎯 Sentiment Analysis Complete: Unclear
+💾 Sentiment saved for call b76b0da1-f0a6-4493-9c73-1d8dd29cf478: Unclear
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+📨 FreJun webhook: recording.completed
+   Data: {'call_id': '4727b17d-2cc7-43fa-adb7-b49cd5a8bf5d', 'recording_id': 'd93c2931-7c43-470e-95df-f13b32a13aa2', 'recording_url': 'https://api.frejun.ai/api/v1/recordings/?recording_id=d93c2931-7c43-470e-95df-f13b32a13aa2'}
+🎙️ Call recording updated: b76b0da1-f0a6-4493-9c73-1d8dd29cf478
+   💾 Recording URL saved: https://api.frejun.ai/api/v1/recordings/?recording...
+INFO:     13.202.4.3:0 - "POST /api/frejun/webhook HTTP/1.1" 200 OK
+INFO:     117.222.60.234:0 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     117.222.60.234:0 - "GET /api/frejun/config HTTP/1.1" 200 OK
+INFO:     117.222.60.234:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     117.222.60.234:0 - "GET /api/calls HTTP/1.1" 200 OK
+INFO:     18.116.101.220:60398 - "GET / HTTP/1.1" 200 OK
+INFO:     18.116.101.220:45778 - "GET / HTTP/1.1" 200 OK
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     16.58.56.214:43238 - "GET / HTTP/1.1" 200 OK
+INFO:     16.58.56.214:45390 - "GET / HTTP/1.1" 200 OK
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     142.93.13.27:50410 - "GET / HTTP/1.1" 200 OK
+INFO:     142.93.13.27:50414 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     190.129.100.235:61728 - "GET /playlist.m3u8 HTTP/1.1" 404 Not Found
+INFO:     190.129.100.235:61728 - "GET /playlist.m3u8 HTTP/1.1" 404 Not Found
+INFO:     190.129.100.235:61728 - "GET /playlist.m3u8 HTTP/1.1" 404 Not Found
+INFO:     190.129.100.235:61728 - "GET /playlist.m3u8 HTTP/1.1" 404 Not Found
+INFO:     190.129.100.235:61728 - "GET /playlist.m3u8 HTTP/1.1" 404 Not Found
+WARNING:  Unsupported upgrade request.
+WARNING:  No supported WebSocket library detected. Please use "pip install 'uvicorn[standard]'", or install 'websockets' or 'wsproto' manually.
+WARNING:  Invalid HTTP request received.
+INFO:     152.59.63.16:0 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     152.59.63.16:0 - "GET /api/frejun/config HTTP/1.1" 200 OK
+INFO:     152.59.63.16:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     152.59.63.16:0 - "GET /api/calls HTTP/1.1" 200 OK
+INFO:     152.59.63.16:0 - "GET /api/settings HTTP/1.1" 200 OK
+INFO:     152.59.63.16:0 - "GET /api/frejun/config HTTP/1.1" 200 OK
+INFO:     152.59.63.16:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     152.59.63.16:0 - "GET /api/calls HTTP/1.1" 200 OK
+INFO:     152.59.63.16:0 - "GET /api/agents HTTP/1.1" 200 OK
+WARNING:  Invalid HTTP request received.
+INFO:     152.59.63.16:0 - "GET /api/agents HTTP/1.1" 200 OK
+INFO:     152.59.63.16:0 - "GET /api/agent/voices HTTP/1.1" 200 OK
+INFO:     152.59.63.16:0 - "GET /api/agent/prompt-variables HTTP/1.1" 200 OK
+INFO:     152.59.63.16:0 - "GET /api/agents/c0c15538-6f40-4076-9e97-1402694385c3 HTTP/1.1" 200 OK
+INFO:     152.59.63.16:0 - "GET /api/agents/c0c15538-6f40-4076-9e97-1402694385c3/knowledge-bases HTTP/1.1" 200 OK

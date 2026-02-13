@@ -408,7 +408,7 @@ def ask_ai_streaming_parallel(text: str):
                 rag_done.set()
         
         threading.Thread(target=fetch_rag, daemon=True).start()
-        rag_done.wait(timeout=3.0)  # Wait max 3 seconds for RAG - MUST have context to avoid hallucination
+        rag_done.wait(timeout=1.5)  # Wait max 1.5 seconds for RAG (reduced from 3s for lower latency)
         
         if rag_done.is_set() and rag_result[0]:
             context = rag_result[0]
@@ -554,7 +554,7 @@ def ask_ai_streaming_for_agent(
                 rag_done.set()
         
         threading.Thread(target=fetch_rag, daemon=True).start()
-        rag_done.wait(timeout=3.0)  # Wait max 3 seconds for RAG
+        rag_done.wait(timeout=1.5)  # Wait max 1.5 seconds for RAG (reduced from 3s for lower latency)
         
         if rag_done.is_set() and rag_result[0]:
             context = rag_result[0]
