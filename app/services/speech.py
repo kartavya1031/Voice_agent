@@ -107,7 +107,9 @@ def create_streaming_recognizer(on_text_callback, on_barge_in_callback=None, sam
     
     # Barge-in state tracking
     last_barge_in_time = [0]
-    barge_in_debounce_ms = 300  # Minimum time between barge-in signals
+    barge_in_debounce_ms = 1
+    
+    00  # Minimum time between barge-in signals
     min_barge_in_words = 1  # Minimum words to trigger barge-in
     
     def recognized(evt):

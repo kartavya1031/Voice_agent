@@ -402,17 +402,23 @@ async def get_incoming_call_flow(req: Request):
     from_number = None
     call_id = None
     
+    import sys
+    print(f"🔍 DEBUG: Starting agent lookup, method={req.method}", flush=True)
+    sys.stdout.flush()
+    
     try:
         # Try to get call details from request body (FreJun may POST call info)
         if req.method == "POST":
+            print(f"🔍 DEBUG: Parsing POST body...", flush=True)
             try:
                 body = await req.json()
+                print(f"🔍 DEBUG: Body parsed: {body}", flush=True)
                 to_number = body.get("to_number") or body.get("to") or body.get("called_number")
                 from_number = body.get("from_number") or body.get("from") or body.get("caller_number")
                 call_id = body.get("call_id")
-                print(f"📞 Incoming call: from={from_number}, to={to_number}, call_id={call_id}")
-            except:
-                pass
+                print(f"📞 Incoming call: from={from_number}, to={to_number}, call_id={call_id}", flush=True)
+            except Exception as json_error:
+                print(f"   ⚠️ Could not parse JSON body: {json_error}", flush=True)
         else:
             # GET request - check query params
             to_number = req.query_params.get("to_number") or req.query_params.get("to")
@@ -428,6 +434,8 @@ async def get_incoming_call_flow(req: Request):
                 print(f"   🤖 Found agent for {to_number}: {agent.name} (ID: {agent_id})")
             else:
                 print(f"   ⚠️ No agent configured for phone: {to_number}, using default")
+        else:
+            print(f"   ⚠️ No to_number provided in request")
     except Exception as e:
         print(f"   ⚠️ Error looking up agent: {e}")
     
@@ -488,6 +496,11 @@ async def frejun_webhook(request: Request):
                 active_calls[call_id]["duration"] = data.get("duration", 0)
             elif event == "call.failed":
                 active_calls[call_id]["failure"] = data.get("failure", {})
+                # Log full failure details for debugging
+                print(f"   ⚠️ Call failure details: {data}")
+                failure_reason = data.get("failure_reason") or data.get("reason") or data.get("error")
+                if failure_reason:
+                    print(f"   ⚠️ Failure reason: {failure_reason}")
         
         # Update database
         if call_id:

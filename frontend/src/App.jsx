@@ -566,6 +566,63 @@ function App() {
         setVisibleColumns(prev => ({ ...prev, [column]: !prev[column] }))
     }
 
+    // Export filtered call history to CSV
+    const exportToCSV = () => {
+        const filteredCalls = getFilteredCallHistory()
+        
+        if (filteredCalls.length === 0) {
+            addLog('No data to export')
+            return
+        }
+
+        // Build CSV headers based on visible columns
+        const headers = []
+        if (visibleColumns.date) headers.push('Date')
+        if (visibleColumns.initiatedBy) headers.push('Initiated By')
+        if (visibleColumns.contact) headers.push('Contact')
+        if (visibleColumns.number) headers.push('Number')
+        if (visibleColumns.duration) headers.push('Duration')
+        if (visibleColumns.status) headers.push('Status')
+        if (visibleColumns.sentiment) headers.push('Sentiment')
+        
+        // Build CSV rows
+        const rows = filteredCalls.map(call => {
+            const row = []
+            if (visibleColumns.date) row.push(`"${formatDateTime(call.start_time || call.created_at)}"`)
+            if (visibleColumns.initiatedBy) row.push(`"${call.user_name || 'System'}"`)
+            if (visibleColumns.contact) row.push(`"${call.from_number ? 'Outbound' : 'Unknown'}"`)
+            if (visibleColumns.number) row.push(`"${call.to_number || call.from_number || 'N/A'}"`)
+            if (visibleColumns.duration) row.push(`"${formatDuration(call.duration_seconds || 0)}"`)
+            if (visibleColumns.status) row.push(`"${call.status}"`)
+            if (visibleColumns.sentiment) row.push(`"${call.sentiment || 'Pending'}"`)
+            return row.join(',')
+        })
+        
+        // Create CSV content
+        const csvContent = [headers.join(','), ...rows].join('\n')
+        
+        // Create download link
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+        const link = document.createElement('a')
+        const url = URL.createObjectURL(blob)
+        
+        // Generate filename with current date and applied filters
+        let filename = 'call_history_'
+        if (dateFilter) filename += `${dateFilter}_`
+        if (statusFilter !== 'all') filename += `${statusFilter}_`
+        if (sentimentFilter !== 'all') filename += `${sentimentFilter.replace(/\s+/g, '_')}_`
+        filename += `${new Date().toISOString().split('T')[0]}.csv`
+        
+        link.setAttribute('href', url)
+        link.setAttribute('download', filename)
+        link.style.visibility = 'hidden'
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        
+        addLog(`✅ Exported ${filteredCalls.length} calls to ${filename}`)
+    }
+
     const formatDateTime = (dateStr) => {
         if (!dateStr) return 'Unknown'
         const utcDateStr = dateStr.endsWith('Z') ? dateStr : `${dateStr}Z`;
@@ -885,6 +942,15 @@ function App() {
                                             <label><input type="checkbox" checked={visibleColumns.actions} onChange={() => toggleColumn('actions')} /> Actions</label>
                                         </div>
                                     </div>
+
+                                    {/* Export Button */}
+                                    <button 
+                                        className="export-btn" 
+                                        onClick={exportToCSV}
+                                        disabled={getFilteredCallHistory().length === 0}
+                                    >
+                                        📥 Export CSV
+                                    </button>
                                 </div>
                             </section>
                             <section className="section">
