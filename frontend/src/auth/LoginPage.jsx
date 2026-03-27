@@ -46,7 +46,7 @@ export function LoginPage() {
                     <div className="login-header">
                         <div className="login-logo">
                             <div className="logo-icon">🎙️</div>
-                            <h1>Anvenssa</h1>
+                            <h1>Company Voice Agent</h1>
                         </div>
                         <p className="login-subtitle">AI Voice Agent Platform</p>
                     </div>

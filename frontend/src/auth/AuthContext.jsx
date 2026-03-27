@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 
 // API URL - same as in App.jsx
-const API_URL = 'https://voice.anvenssa.com';
+const API_URL = 'http://localhost:8000';
 
 const AuthContext = createContext(null);
 
@@ -11,13 +11,13 @@ export function AuthProvider({ children }) {
 
     // Check for existing session on mount
     useEffect(() => {
-        const storedUser = localStorage.getItem('anvenssa_user');
+        const storedUser = localStorage.getItem('company_voice_user');
         if (storedUser) {
             try {
                 const parsedUser = JSON.parse(storedUser);
                 setUser(parsedUser);
             } catch (e) {
-                localStorage.removeItem('anvenssa_user');
+                localStorage.removeItem('company_voice_user');
             }
         }
         setIsLoading(false);
@@ -45,7 +45,7 @@ export function AuthProvider({ children }) {
                 };
 
                 setUser(userData);
-                localStorage.setItem('anvenssa_user', JSON.stringify(userData));
+                localStorage.setItem('company_voice_user', JSON.stringify(userData));
                 return { success: true };
             } else {
                 return { success: false, error: data.message || 'Invalid credentials' };
@@ -61,7 +61,7 @@ export function AuthProvider({ children }) {
     const fallbackLogin = (username, password) => {
         const FALLBACK_USERS = {
             'Agentx': {
-                password: 'Anvenssa@123',
+                password: 'Admin@123',
                 role: 'admin',
                 displayName: 'AgentX Admin'
             }
@@ -85,7 +85,7 @@ export function AuthProvider({ children }) {
         };
 
         setUser(userData);
-        localStorage.setItem('anvenssa_user', JSON.stringify(userData));
+        localStorage.setItem('company_voice_user', JSON.stringify(userData));
         return { success: true };
     };
 
@@ -96,7 +96,7 @@ export function AuthProvider({ children }) {
             console.error('Logout API error:', error);
         }
         setUser(null);
-        localStorage.removeItem('anvenssa_user');
+        localStorage.removeItem('company_voice_user');
     };
 
     const isAdmin = () => user?.role === 'admin';

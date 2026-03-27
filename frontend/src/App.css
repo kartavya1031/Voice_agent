@@ -1,19 +1,20 @@
 :root {
-  --primary: #1a1a2e;
-  --primary-light: #4a4a6a;
-  --accent: #c4704f;
-  --accent-light: #e8a88a;
-  --success: #22c55e;
-  --danger: #ef4444;
+  --primary: #0f172a;
+  --primary-light: #334155;
+  --accent: #6366f1;
+  --accent-light: #818cf8;
+  --accent-glow: rgba(99, 102, 241, 0.15);
+  --success: #10b981;
+  --danger: #f43f5e;
   --warning: #f59e0b;
-  --bg-light: #f8f9fa;
+  --bg-light: #f1f5f9;
   --bg-white: #ffffff;
-  --bg-sidebar: #1a1a2e;
-  --text-dark: #1a1a2e;
-  --text-muted: #6b7280;
-  --text-light: #9ca3af;
-  --border: #e5e7eb;
-  --shadow: rgba(0, 0, 0, 0.08);
+  --bg-sidebar: #0f172a;
+  --text-dark: #0f172a;
+  --text-muted: #64748b;
+  --text-light: #94a3b8;
+  --border: #e2e8f0;
+  --shadow: rgba(0, 0, 0, 0.06);
 }
 
 * {
@@ -59,9 +60,13 @@ body {
 }
 
 .sidebar-logo {
-  font-size: 1.4rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: white;
+  background: linear-gradient(135deg, #fff 60%, var(--accent-light));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .sidebar-nav {
@@ -99,8 +104,9 @@ body {
 }
 
 .nav-item.active {
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-light));
   color: white;
+  box-shadow: 0 2px 12px var(--accent-glow);
 }
 
 .nav-icon {
@@ -173,8 +179,9 @@ body {
 
 .welcome-text {
   font-size: 1.5rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-dark);
+  letter-spacing: -0.02em;
 }
 
 .header-actions {
@@ -194,11 +201,13 @@ body {
   color: var(--text-dark);
   font-size: 0.9rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .header-btn:hover {
-  border-color: var(--text-muted);
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 2px 8px var(--accent-glow);
 }
 
 /* Content Area */
@@ -231,13 +240,15 @@ body {
 .card {
   background: var(--bg-white);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 24px;
-  transition: all 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .card:hover {
-  box-shadow: 0 4px 12px var(--shadow);
+  box-shadow: 0 8px 30px rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.2);
+  transform: translateY(-2px);
 }
 
 .card-header {
@@ -260,18 +271,22 @@ body {
 
 .card-icon.call {
   background: linear-gradient(135deg, var(--accent), var(--accent-light));
+  box-shadow: 0 4px 12px var(--accent-glow);
 }
 
 .card-icon.settings {
-  background: linear-gradient(135deg, #6366f1, #a78bfa);
+  background: linear-gradient(135deg, #8b5cf6, #c4b5fd);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.2);
 }
 
 .card-icon.logs {
   background: linear-gradient(135deg, #0ea5e9, #67e8f9);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
 }
 
 .card-icon.history {
-  background: linear-gradient(135deg, #22c55e, #86efac);
+  background: linear-gradient(135deg, #10b981, #6ee7b7);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
 }
 
 .card-title {
@@ -313,12 +328,12 @@ body {
   gap: 4px;
   margin: 0 auto 20px;
   transition: all 0.3s ease;
-  box-shadow: 0 8px 24px rgba(196, 112, 79, 0.3);
+  box-shadow: 0 8px 24px var(--accent-glow);
 }
 
 .call-btn:hover:not(:disabled) {
-  transform: scale(1.05);
-  box-shadow: 0 12px 32px rgba(196, 112, 79, 0.4);
+  transform: scale(1.08);
+  box-shadow: 0 12px 40px rgba(99, 102, 241, 0.4);
 }
 
 .call-btn:disabled {

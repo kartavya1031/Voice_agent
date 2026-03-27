@@ -6,7 +6,7 @@
     justify-content: center;
     position: relative;
     overflow: hidden;
-    background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #0f0f23 100%);
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
@@ -28,7 +28,7 @@
 .orb-1 {
     width: 600px;
     height: 600px;
-    background: linear-gradient(135deg, #c4704f 0%, #e8a88a 100%);
+    background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
     top: -200px;
     left: -200px;
     animation-delay: 0s;
@@ -166,7 +166,7 @@
 .login-logo h1 {
     font-size: 2rem;
     font-weight: 700;
-    background: linear-gradient(135deg, #ffffff 0%, #c4704f 50%, #e8a88a 100%);
+    background: linear-gradient(135deg, #ffffff 0%, #818cf8 50%, #a78bfa 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -230,9 +230,9 @@
 
 .form-group input:focus {
     outline: none;
-    border-color: #c4704f;
+    border-color: #6366f1;
     background: rgba(255, 255, 255, 0.08);
-    box-shadow: 0 0 0 4px rgba(196, 112, 79, 0.15);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
 }
 
 .toggle-password {
@@ -300,7 +300,7 @@
     gap: 10px;
     width: 100%;
     padding: 16px 24px;
-    background: linear-gradient(135deg, #c4704f 0%, #e8a88a 100%);
+    background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
     border: none;
     border-radius: 12px;
     color: white;
@@ -308,13 +308,13 @@
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(196, 112, 79, 0.3);
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
     margin-top: 8px;
 }
 
 .login-button:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(196, 112, 79, 0.4);
+    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
 }
 
 .login-button:active:not(:disabled) {
@@ -336,7 +336,7 @@
 }
 
 .login-button.loading {
-    background: linear-gradient(135deg, #8b5a3e 0%, #c4704f 100%);
+    background: linear-gradient(135deg, #4338ca 0%, #6366f1 100%);
 }
 
 /* Spinner */
@@ -401,7 +401,7 @@
 .feature-item:hover {
     background: rgba(255, 255, 255, 0.08);
     transform: translateX(8px);
-    border-color: rgba(196, 112, 79, 0.3);
+    border-color: rgba(99, 102, 241, 0.3);
 }
 
 .feature-icon {
@@ -411,7 +411,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(196, 112, 79, 0.15);
+    background: rgba(99, 102, 241, 0.15);
     border-radius: 14px;
 }
 

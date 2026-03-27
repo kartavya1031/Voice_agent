@@ -5,8 +5,8 @@ import AgentList from './components/AgentList.jsx'
 import AgentConfig from './components/AgentConfig.jsx'
 import BulkCampaign from './components/BulkCampaign.jsx'
 
-const API_URL = 'https://voice.anvenssa.com'
-const WS_URL = 'wss://voice.anvenssa.com/ws/audio'
+const API_URL = 'http://localhost:8000'
+const WS_URL = 'ws://localhost:8000/ws/audio'
 // const API_URL = 'http://localhost:8000'
 // const WS_URL = 'ws://localhost:8000/ws/audio'
 
@@ -675,7 +675,7 @@ function App() {
             {/* Sidebar */}
             <aside className="sidebar">
                 <div className="sidebar-header">
-                    <div className="sidebar-logo">🎙️ Anvenssa</div>
+                    <div className="sidebar-logo">🎙️ Company Voice Agent</div>
                 </div>
                 <nav className="sidebar-nav">
                     <div className="nav-section">
