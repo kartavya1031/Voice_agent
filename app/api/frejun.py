@@ -239,7 +239,7 @@ async def initiate_campaign_call(
     call_id = str(uuid.uuid4())[:8]
     
     # Get base URL for flow
-    base_url = os.getenv("PUBLIC_BASE_URL", "https://voice.anvenssa.com")
+    base_url = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000")
     flow_url = f"{base_url}/api/frejun/flow/{call_id}"
     status_callback_url = f"{base_url}/api/frejun/webhook"
     

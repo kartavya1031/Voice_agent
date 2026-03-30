@@ -35,7 +35,7 @@ def create_test_org_and_user():
             print(f"✅ Updated user2 with organization_id: {org_id}")
         else:
             # Create user2 if doesn't exist
-            password_hash = UserService.hash_password("Anvenssa@123")
+            password_hash = UserService.hash_password("Admin@123")
             user = User(
                 username="user2",
                 password_hash=password_hash,
@@ -53,7 +53,7 @@ def create_test_org_and_user():
         print(f"   Organization: {org.name}")
         print(f"   Organization ID: {org_id}")
         print(f"   Username: user2")
-        print(f"   Password: Anvenssa@123")
+        print(f"   Password: Admin@123")
         print(f"\n🔒 This user will only see agents/calls for 'Test Organization 2'")
         
     except Exception as e:

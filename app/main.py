@@ -55,7 +55,7 @@ from app.api.auth import router as auth_router
 from app.api.agents import router as agents_router
 from app.api.campaigns import router as campaigns_router  # NEW: Bulk calling campaigns
 
-app = FastAPI(title="Anvenssa Voice Agent API")
+app = FastAPI(title="Company Voice Agent API")
 
 # Include API routers
 app.include_router(frejun_router)

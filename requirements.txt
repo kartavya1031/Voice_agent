@@ -1,4 +1,4 @@
-# Anvenssa.AI Voice Agent - Python Dependencies
+# Company Voice Agent - Python Dependencies
 # Install all with: pip install -r requirements.txt
 
 # Web Framework

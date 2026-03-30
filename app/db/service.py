@@ -592,7 +592,7 @@ class UserService:
                 # Create default admin user
                 UserService.create_user(
                     username="Agentx",
-                    password="Anvenssa@123",
+                    password="Admin@123",
                     role="super_admin",  # Changed from 'admin' to 'super_admin'
                     display_name="AgentX Admin"
                 )

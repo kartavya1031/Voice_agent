@@ -1,9 +1,9 @@
-# Anvenssa.AI Knowledge Base
+# Company Voice Agent Knowledge Base
 
-## About Anvenssa.AI
-Anvenssa.AI is a privately held company headquartered in India. At Anvenssa.AI, we are dedicated to revolutionizing the IT landscape with cutting-edge AI solutions. Our mission is to empower businesses with intelligent tools that drive efficiency, innovation, and growth. With a focus on excellence and customer satisfaction, we strive to be the trusted partner in your digital transformation journey.
+## About Company Voice Agent
+Company Voice Agent is a privately held company headquartered in India. At Company Voice Agent, we are dedicated to revolutionizing the IT landscape with cutting-edge AI solutions. Our mission is to empower businesses with intelligent tools that drive efficiency, innovation, and growth. With a focus on excellence and customer satisfaction, we strive to be the trusted partner in your digital transformation journey.
 
-At Anvenssa AI, we blend the power of Artificial Intelligence with deep expertise in IT consulting to supercharge your eCommerce business. In today's fast-paced digital landscape, staying ahead requires more than just a competitive edge - it demands innovation, efficiency, and personalized solutions. Our AI-driven IT consulting services are tailored to revolutionize your eCommerce operations. From enhancing customer experiences and optimizing supply chain management to harnessing data analytics for smarter decision-making, we offer a comprehensive range of solutions designed to help you thrive in the digital marketplace.
+At Company Voice Agent, we blend the power of Artificial Intelligence with deep expertise in IT consulting to supercharge your eCommerce business. In today's fast-paced digital landscape, staying ahead requires more than just a competitive edge - it demands innovation, efficiency, and personalized solutions. Our AI-driven IT consulting services are tailored to revolutionize your eCommerce operations. From enhancing customer experiences and optimizing supply chain management to harnessing data analytics for smarter decision-making, we offer a comprehensive range of solutions designed to help you thrive in the digital marketplace.
 
 ## Company Mission
 1. Customer-Centric Innovation: Commitment to continuously innovate and enhance customer experiences through advanced AI technologies.
@@ -40,7 +40,7 @@ An AI sales agent uses artificial intelligence to interact with customers, gener
 - Upselling and Cross-Selling: Using customer data, AI agents recommend relevant products or services.
 
 ## Improving Customer Service
-Key ways to improve customer service according to Anvenssa AI:
+Key ways to improve customer service according to Company Voice Agent:
 1. Value Great Customer Service: Delivering exceptional service requires embedding customer satisfaction into the organizational culture.
 2. Proactive Issue Resolution: Using client data, businesses can anticipate and address issues before they escalate.
 3. Customer Self-Service Options: Empower customers with AI chatbots and knowledge bases to handle repetitive queries independently.
@@ -88,7 +88,7 @@ An AI automation agency consults with other businesses to improve their day-to-d
 
 ## Contact Information
 Phone: +91 8956512955 (Mon-Fri, 10:00-7:00)
-Email: sales@anvenssa.com
+Email: sales@Company Voice Agent.com
 
 ### Office Locations:
 - India Office: Awfis Binarius, Deepak Nitrate Road, Shastrinagar, Yerawada, Pune, Maharashtra 411006

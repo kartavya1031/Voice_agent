@@ -40,7 +40,7 @@ embedding_fn = embedding_functions.OpenAIEmbeddingFunction(
 )
 
 # Default collection for backward compatibility
-DEFAULT_COLLECTION_NAME = "anvenssa_knowledge"
+DEFAULT_COLLECTION_NAME = "company_knowledge"
 
 
 def _check_and_clean_chromadb():
@@ -130,7 +130,7 @@ client = _init_chromadb_client()
 collection = client.get_or_create_collection(
     name=DEFAULT_COLLECTION_NAME,
     embedding_function=embedding_fn,
-    metadata={"description": "Anvenssa.AI knowledge base for voice agent"}
+    metadata={"description": "Company voice agent knowledge base"}
 )
 
 # Current active collection (can be switched)
@@ -710,4 +710,7 @@ def get_kb_info_by_id(kb_id: str) -> dict:
 
 
 # Load knowledge base on module import
-load_knowledge_base()
+try:
+    load_knowledge_base()
+except Exception as e:
+    print(f"⚠️ Knowledge base loading failed (will retry on first query): {e}")

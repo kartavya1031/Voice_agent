@@ -171,16 +171,16 @@ SKIP_RAG_KEYWORDS = [
 # =============================================================================
 INSTANT_RESPONSES = {
     # Greetings
-    "hello": "Hi there! Welcome to Anvenssa.AI. How can I help you today?",
-    "hi": "Hello! Welcome to Anvenssa.AI. How may I assist you?",
-    "hey": "Hey! Welcome to Anvenssa.AI. What can I do for you?",
+    "hello": "Hi there! Welcome. How can I help you today?",
+    "hi": "Hello! Welcome. How may I assist you?",
+    "hey": "Hey! Welcome. What can I do for you?",
     "hi there": "Hello! How can I assist you today?",
-    "good morning": "Good morning! Welcome to Anvenssa.AI. How can I help?",
+    "good morning": "Good morning! Welcome. How can I help?",
     "good afternoon": "Good afternoon! How may I assist you today?",
-    "good evening": "Good evening! Welcome to Anvenssa.AI. How can I help?",
+    "good evening": "Good evening! Welcome. How can I help?",
     
     # Farewells
-    "bye": "Goodbye! Thank you for contacting Anvenssa.AI. Have a great day!",
+    "bye": "Goodbye! Thank you for contacting us. Have a great day!",
     "goodbye": "Goodbye! It was nice helping you. Take care!",
     "thank you": "You're welcome! Is there anything else I can help with?",
     "thanks": "You're welcome! Let me know if you need anything else.",
